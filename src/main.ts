@@ -1,7 +1,11 @@
+import { Bark } from './bark/bark.ts';
 import { startCountdown } from './countdown.ts';
 import { Field } from './field/field.ts';
 
 const root = document.documentElement;
+
+/** When Bark walks on, measured from the start of the entrance. */
+const BARK_ENTERS_MS = 1700;
 
 /** Resolves when the wordmark's typeface is usable, or after a short wait. */
 function wordmarkFont(): Promise<unknown> {
@@ -30,20 +34,31 @@ async function main(): Promise<void> {
         })
       : null;
 
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const band = document.getElementById('band');
+  const runway = document.getElementById('runway');
+  const bark = stage && band && runway ? new Bark({ stage, ground: band, sizer: runway }) : null;
+
   if (!field) {
+    // Bark does not need the field: he is drawn in SVG.
     root.classList.add('no-field', 'static');
+    if (still) bark?.stand();
+    else bark?.enter();
     return;
   }
 
   root.classList.add('field-on');
   await wordmarkFont();
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (still) {
     root.classList.add('static');
     field.show();
+    bark?.stand();
   } else {
     root.classList.add('intro');
     field.play();
+    // He walks on once the sheet has drawn itself.
+    window.setTimeout(() => bark?.enter(), BARK_ENTERS_MS);
   }
 }
 

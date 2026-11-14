@@ -16,6 +16,9 @@
   --plate-rows: 3;
   --band-rows: 11;
 
+  /* Bark's height, ground to ear tip. */
+  --bark-size: clamp(44px, 7.6vh, 84px);
+
   --edge: clamp(16px, 4vw, 56px);
   --hairline: 1px;
 

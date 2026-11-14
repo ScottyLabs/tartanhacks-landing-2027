@@ -440,6 +440,8 @@ export class Field {
     window.addEventListener(
       'pointerdown',
       (event) => {
+        // A press on Bark is his alone.
+        if (event.target instanceof Element && event.target.closest('.bark')) return;
         const [x, y] = at(event.clientX, event.clientY);
         this.pool.stamp(x, y, 150 * this.pool.unit, performance.now(), 820);
         // A press holds the letters open a little longer than a passing move.

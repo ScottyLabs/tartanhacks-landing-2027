@@ -78,13 +78,14 @@
      the wordmark leaves room for it. */
   min-height: calc((100vh - var(--pitch) * var(--band-rows)) / 2);
   min-height: calc((100svh - var(--pitch) * var(--band-rows)) / 2);
-  padding: calc(var(--pitch) * 4) var(--edge) calc(var(--pitch) * 3);
+  /* No padding below: the runway reaches the band, which Bark stands on. */
+  padding: calc(var(--pitch) * 3) var(--edge) 0;
 }
 
 .wordmark {
   font-family: var(--font-wide);
-  font-size: min((100vw - 2 * var(--edge)) / 5.3, 19vh);
-  font-size: min((100vw - 2 * var(--edge)) / 5.3, 19svh);
+  font-size: min((100vw - 2 * var(--edge)) / 5.3, 18vh);
+  font-size: min((100vw - 2 * var(--edge)) / 5.3, 18svh);
   font-weight: 900;
   font-stretch: 125%;
   line-height: 0.84;
@@ -305,8 +306,13 @@
 }
 
 @media (max-width: 520px) {
+  /* Nothing may be wider than the screen: on a phone every plate can wrap. */
   .plate {
+    max-width: 100%;
     font-size: 15px;
+    text-align: center;
+    text-wrap: balance;
+    white-space: normal;
   }
 
   .plate--strong {
@@ -315,8 +321,6 @@
 
   .plate--lead {
     font-size: 17px;
-    white-space: normal;
-    text-align: center;
   }
 
   .countdown__unit {
@@ -325,5 +329,73 @@
 
   .colophon .plate {
     font-size: 14px;
+  }
+}
+
+/* Narrow phones: the longest footer line fits on one row at this size. */
+@media (max-width: 400px) {
+  .colophon .plate {
+    font-size: 13px;
+  }
+}
+
+/* The narrowest phones: the countdown gives up some of its side padding. */
+@media (max-width: 340px) {
+  .countdown__unit {
+    padding-inline: calc(var(--pitch) * 1.1);
+  }
+}
+
+/* ---------- Short screens: close up the spacing so the page fits ---------- */
+
+@media (max-height: 760px) and (min-width: 721px) {
+  .sheet__top {
+    padding-top: calc(var(--pitch) * 2);
+  }
+
+  .sheet__bottom {
+    padding-top: calc(var(--pitch) * 2);
+  }
+}
+
+@media (max-height: 640px) and (max-width: 520px) {
+  :root {
+    --band-rows: 18;
+    --bark-size: clamp(36px, 7vh, 84px);
+  }
+
+  .sheet__top {
+    gap: var(--pitch);
+    padding-top: calc(var(--pitch) * 2);
+  }
+
+  .facts {
+    row-gap: 0;
+  }
+
+  .runway {
+    margin-top: 0;
+  }
+
+  .sheet__bottom {
+    gap: var(--pitch);
+    padding-top: calc(var(--pitch) * 2);
+    padding-bottom: var(--pitch);
+  }
+
+  .drop {
+    gap: 0;
+  }
+
+  .plate--lead {
+    line-height: calc(var(--pitch) * 4);
+  }
+
+  .countdown__value {
+    line-height: calc(var(--pitch) * 6);
+  }
+
+  .colophon {
+    row-gap: 0;
   }
 }

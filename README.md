@@ -8,6 +8,8 @@ It does three jobs until the theme and registration drop on December 1:
 - counts down to the drop,
 - sends students to the pre-registration form and judges to the judge interest form.
 
+Bark, the ScottyLabs dog, lives on it too: he walks along the top of the sign-up band after your pointer, and jumps when you press him.
+
 On December 1 this site is replaced by the full event site.
 
 ## Run it
@@ -49,6 +51,11 @@ index.html              content and structure
 public/                 files served as they are (boot script, favicon, share image)
 src/main.ts             starts the countdown and the field
 src/countdown.ts        countdown maths and rendering
+src/bark/               Bark, the ScottyLabs dog
+  shape.ts                his three strokes, fitted to the ScottyLabs mark
+  pose.ts                 everything that can move, and the drawing in a pose
+  mind.ts                 how he behaves: chase, turn, stride, jump
+  bark.ts                 puts him on the page and runs him
 src/field/              the drawn background
   field.ts                layout, pointer input, frame loop, the letters' figures
   facets.ts               the folds that open where the pointer travels
@@ -68,6 +75,17 @@ The wordmark is solid only at rest. While the pointer moves, or after a press or
 - **The DOM owns layout.** The wordmark is real text. The field measures where the browser put each glyph and draws the wordmark into the rules at exactly that spot; the text itself stays in place, transparent, for selection and screen readers.
 - **Everything sits on the rule grid.** The distance between two rules is the *pitch*. The field rounds it to whole device pixels so the rules stay sharp, writes the exact value to the `--pitch` custom property, and CSS sizes everything vertical in pitches. Elements marked `data-snap` are nudged so their edges fall between rules.
 - **It only draws when something changes.** The frame loop runs during the entrance and while a fold is open, then stops.
+
+### Bark
+
+Bark is drawn in SVG from the same three strokes as the ScottyLabs mark: one weight, flat ends, one sharp corner at the nose. The curves in `shape.ts` were fitted to the mark and agree with it to a fraction of a stroke's width, so standing still he *is* the mark. Change them only against the mark.
+
+- **He is posed, not swapped.** There are no frames. `pose.ts` moves the points of the drawing: each pair of feet can reach and lift, the head turns about the neck, the ear about its base, the beard about its corner. The path is rebuilt every frame, and the stroke is set in screen pixels, so squashing and turning change his shape but never his line.
+- **Behaviour is separate from drawing.** `mind.ts` turns time and a pointer position into a pose, and knows nothing about the page, which is what makes it testable: `npm test` checks that he reaches the pointer, turns round, stays on his ground, jumps about his own height, and never stretches far from the mark.
+- **His ground is the band.** He stands on the top edge of the sign-up band. The empty strip above it (`.runway`) is as tall as he is; its height is `--bark-size`.
+- **He is a button.** A transparent button follows him, so a click, a tap, or Enter and Space with the keyboard all make him jump.
+
+With reduced motion requested he stands still. Without WebGL he still works, since he does not use the field.
 
 ### Without the field
 

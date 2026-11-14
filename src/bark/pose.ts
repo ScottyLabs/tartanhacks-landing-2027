@@ -1,0 +1,139 @@
+import { BEARD_CORNER, EAR_BASE, NECK, STROKES, type Stroke } from './shape.ts';
+
+/**
+ * Everything that can move in Bark's drawing. At rest every value is zero
+ * and the drawing is the ScottyLabs mark exactly.
+ *
+ * Lengths are in the mark's units. Angles are in radians and turn clockwise
+ * on screen, so a positive head angle lowers the nose.
+ */
+export interface Pose {
+  /** Each pair of feet: how far forward of rest, and how far off the ground. */
+  hindReach: number;
+  hindLift: number;
+  foreReach: number;
+  foreLift: number;
+  /** The head about the neck, the ear about its base, the beard about its corner. */
+  head: number;
+  ear: number;
+  beard: number;
+}
+
+export const REST: Readonly<Pose> = {
+  hindReach: 0,
+  hindLift: 0,
+  foreReach: 0,
+  foreLift: 0,
+  head: 0,
+  ear: 0,
+  beard: 0,
+};
+
+/** How far a stroke runs on past a foot, so the foot can be cut flat. */
+const OVERRUN = 30;
+
+const scratch = new Float32Array(128);
+
+/** Turns (x, y) about a pivot by an angle, writing back into scratch[i], scratch[i + 1]. */
+function turn(i: number, pivot: { x: number; y: number }, angle: number): void {
+  if (angle === 0) return;
+  const dx = scratch[i]! - pivot.x;
+  const dy = scratch[i + 1]! - pivot.y;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  scratch[i] = pivot.x + dx * cos - dy * sin;
+  scratch[i + 1] = pivot.y + dx * sin + dy * cos;
+}
+
+/** Moves a stroke's points into a pose, leaving the result in `scratch`. */
+function place(stroke: Stroke, pose: Pose): number {
+  const count = stroke.rest.length / 2;
+  for (let p = 0; p < count; p++) {
+    const i = p * 2;
+    scratch[i] =
+      stroke.rest[i]! + pose.hindReach * stroke.hindReach[p]! + pose.foreReach * stroke.foreReach[p]!;
+    scratch[i + 1] =
+      stroke.rest[i + 1]! - pose.hindLift * stroke.hindLift[p]! - pose.foreLift * stroke.foreLift[p]!;
+    // Small parts first, so the head carries the ear and the beard with it.
+    turn(i, EAR_BASE, pose.ear * stroke.ear[p]!);
+    turn(i, BEARD_CORNER, pose.beard * stroke.beard[p]!);
+    turn(i, NECK, pose.head * stroke.head[p]!);
+  }
+  return count;
+}
+
+const n = (value: number): string => value.toFixed(1);
+
+/** A point `OVERRUN` beyond (ax, ay), continuing the line from (bx, by) through it. */
+function beyond(ax: number, ay: number, bx: number, by: number): string {
+  const length = Math.hypot(ax - bx, ay - by) || 1;
+  return `${n(ax + ((ax - bx) / length) * OVERRUN)},${n(ay + ((ay - by) / length) * OVERRUN)}`;
+}
+
+/**
+ * The SVG path of one stroke in a pose. Strokes run on a little past each
+ * foot; the caller clips them level with the sole.
+ */
+function trace(stroke: Stroke, pose: Pose, continued: boolean, reversed: boolean): string {
+  const count = place(stroke, pose);
+  const s = scratch;
+  const last = (count - 1) * 2;
+  let d = '';
+
+  if (!reversed) {
+    if (stroke.startsAtFoot) {
+      d += `${continued ? 'L' : 'M'}${beyond(s[0]!, s[1]!, s[2]!, s[3]!)}L${n(s[0]!)},${n(s[1]!)}`;
+    } else {
+      d += `${continued ? 'L' : 'M'}${n(s[0]!)},${n(s[1]!)}`;
+    }
+    for (let i = 2; i <= last; i += 6) {
+      d += `C${n(s[i]!)},${n(s[i + 1]!)} ${n(s[i + 2]!)},${n(s[i + 3]!)} ${n(s[i + 4]!)},${n(s[i + 5]!)}`;
+    }
+    if (stroke.endsAtFoot) d += `L${beyond(s[last]!, s[last + 1]!, s[last - 2]!, s[last - 1]!)}`;
+    return d;
+  }
+
+  if (stroke.endsAtFoot) {
+    d += `${continued ? 'L' : 'M'}${beyond(s[last]!, s[last + 1]!, s[last - 2]!, s[last - 1]!)}`;
+    d += `L${n(s[last]!)},${n(s[last + 1]!)}`;
+  } else {
+    d += `${continued ? 'L' : 'M'}${n(s[last]!)},${n(s[last + 1]!)}`;
+  }
+  for (let i = last - 2; i >= 4; i -= 6) {
+    d += `C${n(s[i]!)},${n(s[i + 1]!)} ${n(s[i - 2]!)},${n(s[i - 1]!)} ${n(s[i - 4]!)},${n(s[i - 3]!)}`;
+  }
+  if (stroke.startsAtFoot) d += `L${beyond(s[0]!, s[1]!, s[2]!, s[3]!)}`;
+  return d;
+}
+
+export interface Drawing {
+  /** One path per stroke: back, front, belly. */
+  lines: [string, string, string];
+  /** The body's outline, closed, for the white that keeps Bark opaque. */
+  fill: string;
+  /** Height of each pair of soles above the ground (zero or more). */
+  hindSole: number;
+  foreSole: number;
+}
+
+/** Draws Bark in a pose. */
+export function draw(pose: Pose): Drawing {
+  const [back, front, belly] = STROKES as [Stroke, Stroke, Stroke];
+  // Around the body: along the back from nose to hind foot, forward under the
+  // belly to the forefoot, then up the chest to the beard and across to the nose.
+  const fill =
+    trace(back, pose, false, false) +
+    trace(belly, pose, true, true) +
+    trace(front, pose, true, true) +
+    'Z';
+  return {
+    lines: [
+      trace(back, pose, false, false),
+      trace(front, pose, false, false),
+      trace(belly, pose, false, false),
+    ],
+    fill,
+    hindSole: Math.max(0, pose.hindLift),
+    foreSole: Math.max(0, pose.foreLift),
+  };
+}

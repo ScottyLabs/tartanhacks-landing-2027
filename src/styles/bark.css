@@ -1,0 +1,65 @@
+/* ---------- Bark, the ScottyLabs dog ---------- */
+
+/* The strip he walks in: as tall as he is, with a little air above his ear.
+   It ends on the band, which is his ground. */
+.runway {
+  flex: none;
+  width: 100%;
+  height: var(--bark-size);
+  margin-top: calc(var(--pitch) * -1);
+}
+
+.bark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.bark[hidden] {
+  display: none;
+}
+
+/* The drawing is positioned by its own transform; the element is only an origin. */
+.bark__art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+}
+
+/* White inside, so he passes in front of whatever is behind him. */
+.bark__fill {
+  fill: var(--paper);
+}
+
+.bark__line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  /* His line keeps its weight however his body is stretched or turned. */
+  vector-effect: non-scaling-stroke;
+}
+
+/* Follows him around: the thing that is pressed, and that takes focus. */
+.bark__button {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bark__button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 4px;
+}
