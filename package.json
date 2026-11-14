@@ -1,0 +1,25 @@
+{
+  "name": "tartanhacks-landing-2027",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Landing page for TartanHacks 2027",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:site": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc",
+    "test": "node --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "vite": "^8.3.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "~7.0.2"
+  }
+}

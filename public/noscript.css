@@ -1,0 +1,9 @@
+/* Without scripting there is no drawn field, so rule the sheet with CSS. */
+.stage {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 4.5px,
+    #000 4.5px 5.5px,
+    transparent 5.5px 10px
+  );
+}

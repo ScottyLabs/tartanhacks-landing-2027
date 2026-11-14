@@ -1,0 +1,328 @@
+/* ---------- Stage: the ruled sheet and everything set on it ---------- */
+
+.stage {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100svh;
+  background-color: var(--paper);
+}
+
+.field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* When the field cannot be drawn, rule the sheet with CSS instead. */
+.no-field .field {
+  display: none;
+}
+
+.no-field .stage {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--pitch) / 2 - 0.5px),
+    var(--ink) calc(var(--pitch) / 2 - 0.5px) calc(var(--pitch) / 2 + 0.5px),
+    transparent calc(var(--pitch) / 2 + 0.5px) var(--pitch)
+  );
+}
+
+/* Three rows: wordmark, band, drop. Spare height goes to the last, which
+   keeps the band on the middle of a typical screen. */
+.sheet {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* ---------- Plates: text set on a clearing in the rules ---------- */
+
+.plate {
+  display: inline-block;
+  padding-inline: calc(var(--pitch) * 1.2);
+  background: var(--paper);
+  font-size: 16px;
+  line-height: calc(var(--pitch) * var(--plate-rows));
+  white-space: nowrap;
+}
+
+.plate a {
+  text-decoration-thickness: var(--hairline);
+  text-underline-offset: 0.22em;
+}
+
+.plate a:hover {
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+/* ---------- Top: wordmark, date, place ---------- */
+
+.sheet__top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--pitch) * 2);
+  /* Tall enough to put the band exactly on the middle of the screen whenever
+     the wordmark leaves room for it. */
+  min-height: calc((100vh - var(--pitch) * var(--band-rows)) / 2);
+  min-height: calc((100svh - var(--pitch) * var(--band-rows)) / 2);
+  padding: calc(var(--pitch) * 4) var(--edge) calc(var(--pitch) * 3);
+}
+
+.wordmark {
+  font-family: var(--font-wide);
+  font-size: min((100vw - 2 * var(--edge)) / 5.3, 19vh);
+  font-size: min((100vw - 2 * var(--edge)) / 5.3, 19svh);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: 0.84;
+  letter-spacing: -0.012em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.wordmark__line {
+  display: block;
+}
+
+/* With the field running, the wordmark is drawn in the rules themselves.
+   The text stays in place, transparent, for selection and assistive tech. */
+.field-on .wordmark {
+  color: transparent;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--pitch) calc(var(--pitch) * 2);
+}
+
+.plate--strong {
+  font-size: 19px;
+  font-weight: 800;
+  font-stretch: 125%;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- Band: the heaviest line on the sheet, and the two forms ---------- */
+
+.band {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: calc(var(--pitch) * var(--band-rows));
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.band__half {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding-inline: calc(var(--pitch) * 4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.band__half--left {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.band__half--right {
+  align-items: flex-start;
+  border-left: var(--hairline) solid var(--paper);
+}
+
+.band__label {
+  font-size: clamp(21px, 2.35vw, 34px);
+  font-weight: 800;
+  font-stretch: 125%;
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+}
+
+.band__note {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.band__half:hover {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow:
+    inset 0 2px 0 var(--ink),
+    inset 0 -2px 0 var(--ink);
+}
+
+.band__half:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: calc(var(--pitch) * -1);
+}
+
+/* ---------- Bottom: the drop, the countdown, the colophon ---------- */
+
+.sheet__bottom {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  gap: calc(var(--pitch) * 2);
+  padding: calc(var(--pitch) * 3) var(--edge) calc(var(--pitch) * 2);
+}
+
+.drop {
+  display: grid;
+  align-self: center;
+  justify-items: center;
+  gap: var(--pitch);
+}
+
+.plate--lead {
+  font-size: clamp(19px, 1.9vw, 26px);
+  font-weight: 700;
+  font-stretch: 112%;
+  line-height: calc(var(--pitch) * (var(--plate-rows) + 1));
+  letter-spacing: -0.008em;
+}
+
+/* The theme's name, struck out with the heaviest line the text can carry. */
+.redacted {
+  display: inline-block;
+  width: 4.8em;
+  height: 0.72em;
+  margin-inline: 0.12em;
+  background: var(--ink);
+}
+
+.countdown {
+  display: inline-grid;
+  grid-auto-flow: column;
+  background: var(--paper);
+}
+
+.countdown[hidden] {
+  display: none;
+}
+
+.countdown__unit {
+  display: grid;
+  justify-items: center;
+  padding: var(--pitch) calc(var(--pitch) * 2.6);
+}
+
+.countdown__unit + .countdown__unit {
+  border-left: var(--hairline) solid var(--ink);
+}
+
+.countdown__value {
+  display: flex;
+  font-family: var(--font-wide);
+  font-size: clamp(36px, 5vw, 62px);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: calc(var(--pitch) * 6);
+  letter-spacing: -0.02em;
+}
+
+/* Each digit keeps a fixed cell so the numerals never shuffle sideways. */
+.countdown__digit {
+  display: inline-block;
+  width: 0.74em;
+  text-align: center;
+}
+
+.countdown__name {
+  font-size: 14px;
+  line-height: calc(var(--pitch) * 2);
+}
+
+.colophon {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--pitch) calc(var(--pitch) * 2);
+  width: 100%;
+}
+
+.colophon .plate {
+  font-size: 15px;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 1180px) {
+  .colophon {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .band {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .band__half {
+    align-items: center;
+    height: calc(var(--pitch) * var(--band-rows) / 2);
+    text-align: center;
+  }
+
+  .band__half--right {
+    border-top: var(--hairline) solid var(--paper);
+    border-left: 0;
+  }
+
+  .countdown__unit {
+    padding-inline: calc(var(--pitch) * 1.6);
+  }
+
+  .countdown__value {
+    line-height: calc(var(--pitch) * 7);
+  }
+
+  .countdown__name {
+    line-height: calc(var(--pitch) * 3);
+  }
+
+  .colophon {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .plate {
+    font-size: 15px;
+  }
+
+  .plate--strong {
+    font-size: 17px;
+  }
+
+  .plate--lead {
+    font-size: 17px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .countdown__unit {
+    padding-inline: calc(var(--pitch) * 1.5);
+  }
+
+  .colophon .plate {
+    font-size: 14px;
+  }
+}

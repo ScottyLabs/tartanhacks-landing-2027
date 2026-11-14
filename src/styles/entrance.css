@@ -1,0 +1,86 @@
+/*
+ * The entrance: one sequence, played once. Everything opens outward from the
+ * vertical centre axis, in step with the rules drawing across the field.
+ *
+ * State classes on <html>:
+ *   js       set before first paint by /boot.js
+ *   intro    set by the main script when the sequence starts
+ *   static   set instead of `intro` when nothing should animate
+ */
+
+/* Held back until the sequence starts. If the main script never arrives,
+   the failsafe shows everything after a few seconds. */
+.js:not(.intro, .static) :is(.wordmark, .band, .plate, .countdown) {
+  visibility: hidden;
+  animation: failsafe 1ms 4s forwards;
+}
+
+@keyframes failsafe {
+  to {
+    visibility: visible;
+  }
+}
+
+.intro .band {
+  animation: draw-band 760ms var(--ease-out) 620ms both;
+}
+
+.intro .band__half > * {
+  animation: fade-in 320ms linear 1180ms both;
+}
+
+.intro :is(.plate, .countdown) {
+  animation: open 620ms var(--ease-out) both;
+}
+
+.intro .facts .plate {
+  animation-delay: 900ms;
+}
+
+.intro .drop .plate {
+  animation-delay: 1040ms;
+}
+
+.intro .countdown {
+  animation-delay: 1140ms;
+}
+
+.intro .colophon .plate {
+  animation-delay: 1300ms;
+}
+
+@keyframes draw-band {
+  from {
+    scale: 0 1;
+  }
+
+  to {
+    scale: 1 1;
+  }
+}
+
+@keyframes open {
+  from {
+    clip-path: inset(0 50%);
+  }
+
+  to {
+    clip-path: inset(0 0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro :is(.band, .band__half > *, .plate, .countdown) {
+    animation: none;
+  }
+}

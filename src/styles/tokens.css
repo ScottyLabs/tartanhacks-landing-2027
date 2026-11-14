@@ -1,0 +1,67 @@
+/*
+ * Two values only: ink and paper. Hierarchy comes from line weight and scale,
+ * never from grey.
+ *
+ * Everything vertical is measured in pitches: the distance between two rules
+ * of the sheet. `--pitch-base` is the intended pitch in CSS pixels; the field
+ * renderer rounds it to whole device pixels and writes the exact result back
+ * to `--pitch`, so DOM edges land precisely between rules.
+ */
+:root {
+  --paper: #fff;
+  --ink: #000;
+
+  --pitch-base: 10;
+  --pitch: 10px;
+  --plate-rows: 3;
+  --band-rows: 11;
+
+  --edge: clamp(16px, 4vw, 56px);
+  --hairline: 1px;
+
+  --font-text: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --font-wide: 'Archivo Wide', 'Archivo', 'Arial Black', sans-serif;
+
+  --ease-out: cubic-bezier(0.16, 0.84, 0.24, 1);
+}
+
+@media (max-width: 900px) {
+  :root {
+    --pitch-base: 8;
+    --pitch: 8px;
+  }
+}
+
+/* Below this width the band's two halves stack, so it is twice as tall. */
+@media (max-width: 720px) {
+  :root {
+    --band-rows: 20;
+  }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --pitch-base: 6;
+    --pitch: 6px;
+    --plate-rows: 4;
+  }
+}
+
+/* One variable file, two families: the full range for text, and a fixed
+   expanded black cut. The fixed cut needs no axis settings, so the field
+   renderer can draw with it by name. */
+@font-face {
+  font-family: 'Archivo';
+  src: url('../assets/fonts/archivo-latin-variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Archivo Wide';
+  src: url('../assets/fonts/archivo-latin-variable.woff2') format('woff2');
+  font-weight: 900;
+  font-stretch: 125%;
+  font-display: swap;
+}
