@@ -86,6 +86,8 @@ Bark is drawn in SVG from the same three strokes as the ScottyLabs mark: one wei
 
 With reduced motion requested he stands still. Without WebGL he still works, since he does not use the field.
 
+The favicon (`public/favicon.svg`) and the home-screen icon are the same drawing, with a heavier line so that it still reads at 16 pixels.
+
 ### Without the field
 
 The page works at every level of support:
