@@ -90,7 +90,7 @@ export class FacetPool {
       }
       this.follower.x = x;
       this.follower.y = y;
-      // Travel turns the figure, like twisting the tube.
+      // Travel turns the figure under the pointer.
       this.follower.source += distance * 0.005;
     }
 

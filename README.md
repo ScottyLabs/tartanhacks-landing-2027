@@ -50,9 +50,9 @@ public/                 files served as they are (boot script, favicon, share im
 src/main.ts             starts the countdown and the field
 src/countdown.ts        countdown maths and rendering
 src/field/              the drawn background
-  field.ts                layout, pointer input, frame loop
+  field.ts                layout, pointer input, frame loop, the letters' figures
   facets.ts               the folds that open where the pointer travels
-  ink.ts                  rasterises the wordmark from the DOM
+  ink.ts                  rasterises the wordmark from the DOM, and which letter owns each pixel
   shader.ts               the fragment shader that draws it all
 src/styles/             tokens, base, layout, entrance
 ```
@@ -62,6 +62,8 @@ src/styles/             tokens, base, layout, entrance
 The background is one WebGL 2 canvas behind the page. It draws a sheet of horizontal rules, draws the wordmark into them, and folds the sheet into mirrored figures where the pointer travels.
 
 Above the band the plain rules only pass through: they draw in with the rest of the sheet during the entrance, then leave, so the wordmark sits solid on white. The sheet is still there underneath, and shows again inside every fold, where the wordmark breaks into heavy rules.
+
+The wordmark is solid only at rest. While the pointer moves, or after a press or tap, each letter opens into a mirrored figure of its own, cut to the letter's shape. The number of mirrors follows the letter: three for A, four for T and H, twelve for the round C. The figures turn as the pointer travels, and close back to solid when it rests.
 
 - **The DOM owns layout.** The wordmark is real text. The field measures where the browser put each glyph and draws the wordmark into the rules at exactly that spot; the text itself stays in place, transparent, for selection and screen readers.
 - **Everything sits on the rule grid.** The distance between two rules is the *pitch*. The field rounds it to whole device pixels so the rules stay sharp, writes the exact value to the `--pitch` custom property, and CSS sizes everything vertical in pitches. Elements marked `data-snap` are nudged so their edges fall between rules.
