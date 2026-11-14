@@ -78,7 +78,7 @@ The wordmark is solid only at rest. While the pointer moves, or after a press or
 
 ### Bark
 
-Bark is drawn in SVG from the same three strokes as the ScottyLabs mark: one weight, flat ends, one sharp corner at the nose. The curves in `shape.ts` were fitted to the mark and agree with it to a fraction of a stroke's width, so standing still he *is* the mark. Change them only against the mark.
+Bark is drawn in SVG from the same three strokes as the ScottyLabs mark: one weight, flat ends, one sharp corner at the nose. The curves in `shape.ts` were fitted to the mark and agree with it to a fraction of a stroke's width, so standing still he *is* the mark. Change them only against the mark, which is kept in `ScottyLabs-Logo/scottylabs-logo-square.png` for that purpose; the site itself does not use the image.
 
 - **He is posed, not swapped.** There are no frames. `pose.ts` moves the points of the drawing: each pair of feet can reach and lift, the head turns about the neck, the ear about its base, the beard about its corner. The path is rebuilt every frame, and the stroke is set in screen pixels, so squashing and turning change his shape but never his line.
 - **Behaviour is separate from drawing.** `mind.ts` turns time and a pointer position into a pose, and knows nothing about the page, which is what makes it testable: `npm test` checks that he reaches the pointer, turns round, stays on his ground, jumps about his own height, and never stretches far from the mark.
