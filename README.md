@@ -79,7 +79,7 @@ The page works at every level of support:
 
 The repo ships a `Dockerfile` that builds the site and serves it with nginx on port 80, with a `/healthz` check and a strict Content-Security-Policy. It follows the conventions of [Sheltie](https://github.com/scottylabs-labrador/sheltie), ScottyLabs' deployment platform:
 
-- Source: this repo through the `sheltie-scottylabs` GitHub App
+- Source: this repo, as a public Git repository (or through the `sheltie-scottylabs` GitHub App, which adds deploy-on-push)
 - Build pack: Dockerfile
 - Ports exposes: `80`
 - Health check path: `/healthz`
