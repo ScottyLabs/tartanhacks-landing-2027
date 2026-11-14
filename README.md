@@ -41,6 +41,7 @@ Everything a visitor reads is in `index.html`.
 | The drop moment | the `datetime` on `<time id="drop-time">` in `index.html` (midnight Eastern, December 1, 2026) |
 | The site's public address | `VITE_SITE_URL` in `.env`, used for the share image |
 | Share image | `public/og.png` (1200 × 630) |
+| Search listing | the `<title>`, the description and the event data (`application/ld+json`) in the head of `index.html` |
 
 ## How it is built
 
@@ -103,6 +104,10 @@ The page works at every level of support:
 The repo ships a `Dockerfile` that builds the site and serves it with nginx, with a strict Content-Security-Policy. nginx listens on `$PORT`, or on 80 when that is not set, and answers health checks at `/health` and `/healthz`.
 
 The page sets no inline styles or scripts in its markup, so it runs under `style-src 'self'; script-src 'self'`. Keep it that way when editing, or nginx's policy will block the change.
+
+### Search engines
+
+Only `tartanhacks.com` is meant to be indexed. The page names it as its canonical address, `robots.txt` and `sitemap.xml` point at it, and nginx sends `X-Robots-Tag: noindex` on every other address the site answers on, so previews never compete with it in search results. If the site ever moves, change `VITE_SITE_URL` in `.env`, the two files in `public/`, and the `map` at the top of `nginx.conf`.
 
 ### Railway
 

@@ -3,25 +3,83 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>TartanHacks 2027 | February 5–6 at Carnegie Mellon</title>
+    <title>TartanHacks 2027: Carnegie Mellon’s hackathon, February 5–6</title>
     <meta
       name="description"
-      content="TartanHacks 2027, hosted by ScottyLabs at Carnegie Mellon University in Pittsburgh, runs February 5–6. The theme and registration drop December 1."
+      content="TartanHacks is Pittsburgh’s largest hackathon, hosted by ScottyLabs at Carnegie Mellon University. February 5–6, 2027. Pre-register now; the theme and registration drop December 1."
     />
+    <link rel="canonical" href="%VITE_SITE_URL%/" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="color-scheme" content="light only" />
 
+    <!-- Link previews -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="TartanHacks 2027" />
+    <meta property="og:site_name" content="TartanHacks" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="TartanHacks 2027 by ScottyLabs" />
     <meta
       property="og:description"
-      content="February 5–6 at Carnegie Mellon University, Pittsburgh. The theme and registration drop December 1."
+      content="Pittsburgh’s largest hackathon. February 5–6, 2027, at Carnegie Mellon University. The theme and registration drop December 1."
     />
     <meta property="og:url" content="%VITE_SITE_URL%/" />
     <meta property="og:image" content="%VITE_SITE_URL%/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="TartanHacks by ScottyLabs. February 5–6, 2027. Carnegie Mellon University, Pittsburgh, PA."
+    />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TartanHacks 2027 by ScottyLabs" />
+    <meta
+      name="twitter:description"
+      content="Pittsburgh’s largest hackathon. February 5–6, 2027, at Carnegie Mellon University."
+    />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og.png" />
+
+    <!-- The event, described for search engines. Data, not code: it is never run. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "%VITE_SITE_URL%/#website",
+            "name": "TartanHacks",
+            "url": "%VITE_SITE_URL%/"
+          },
+          {
+            "@type": "Hackathon",
+            "@id": "%VITE_SITE_URL%/#event",
+            "name": "TartanHacks 2027",
+            "description": "TartanHacks is Pittsburgh’s largest hackathon, hosted by ScottyLabs at Carnegie Mellon University.",
+            "startDate": "2027-02-05",
+            "endDate": "2027-02-06",
+            "eventStatus": "https://schema.org/EventScheduled",
+            "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+            "url": "%VITE_SITE_URL%/",
+            "image": ["%VITE_SITE_URL%/og.png"],
+            "location": {
+              "@type": "Place",
+              "name": "Carnegie Mellon University",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "5000 Forbes Avenue",
+                "addressLocality": "Pittsburgh",
+                "addressRegion": "PA",
+                "postalCode": "15213",
+                "addressCountry": "US"
+              }
+            },
+            "organizer": {
+              "@type": "Organization",
+              "name": "ScottyLabs",
+              "url": "https://scottylabs.org"
+            }
+          }
+        ]
+      }
+    </script>
 
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

@@ -9,10 +9,10 @@
   margin-top: calc(var(--pitch) * -1);
 }
 
+/* A layer over the whole stage; only the button on it takes the pointer. */
 .bark {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   z-index: 2;
   pointer-events: none;
 }
@@ -21,13 +21,12 @@
   display: none;
 }
 
-/* The drawing is positioned by its own transform; the element is only an origin. */
+/* The drawing covers the layer, so its coordinates are the stage's own. */
 .bark__art {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 
@@ -41,8 +40,6 @@
   stroke: var(--ink);
   stroke-linecap: butt;
   stroke-linejoin: miter;
-  /* His line keeps its weight however his body is stretched or turned. */
-  vector-effect: non-scaling-stroke;
 }
 
 /* Follows him around: the thing that is pressed, and that takes focus. */

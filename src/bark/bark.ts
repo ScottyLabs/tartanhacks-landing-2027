@@ -12,9 +12,7 @@ export interface BarkOptions {
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/** The middle of his body, in the drawing's own units. */
-const MIDDLE = (LEFT + RIGHT) / 2;
-/** Far enough to cover the drawing in every pose. */
+/** Far enough to cover the drawing in every pose, and the page at any size. */
 const FAR = 4000;
 
 function svg<K extends keyof SVGElementTagNameMap>(
@@ -29,7 +27,8 @@ function svg<K extends keyof SVGElementTagNameMap>(
 /**
  * Bark on the page: he walks along the top edge of the ground element after
  * the pointer, and jumps when pressed. The drawing is rebuilt from his pose
- * every frame, so his line weight never changes however he moves.
+ * every frame. Squashing and turning move its points; the only transform on
+ * it is a uniform one, so his line keeps its weight however he moves.
  */
 export class Bark {
   private readonly stage: HTMLElement;
@@ -40,8 +39,7 @@ export class Bark {
   private readonly body: SVGGElement;
   private readonly fill: SVGPathElement;
   private readonly lines: SVGPathElement[];
-  private readonly hindSole: SVGRectElement;
-  private readonly foreSole: SVGRectElement;
+  private readonly soles: SVGPathElement;
   private readonly floor: SVGRectElement;
   private readonly button: HTMLButtonElement;
 
@@ -52,7 +50,6 @@ export class Bark {
   private readonly home = 0.14;
 
   private lastStep = 0;
-  private lastStroke = 0;
 
   constructor(options: BarkOptions) {
     this.stage = options.stage;
@@ -65,11 +62,13 @@ export class Bark {
 
     const art = svg('svg', { class: 'bark__art', 'aria-hidden': 'true', focusable: 'false' });
     // Each pair of feet is cut level with its own soles, as the mark cuts them
-    // level with the ground.
+    // level with the ground. The clip is one path with a step under his middle.
+    // It must stay a single shape: given two, Safari clips through a buffer
+    // sized without his line, and shaves the outer half of it off his rump
+    // and nose.
     const soles = svg('clipPath', { id: 'bark-soles' });
-    this.hindSole = svg('rect', { x: String(-FAR), y: String(-FAR), width: String(FAR), height: String(FAR) });
-    this.foreSole = svg('rect', { x: '0', y: String(-FAR), width: String(FAR), height: String(FAR) });
-    soles.append(this.hindSole, this.foreSole);
+    this.soles = svg('path');
+    soles.append(this.soles);
     // Nothing of him shows below the ground, however he leans on a planted foot.
     const above = svg('clipPath', { id: 'bark-above-ground' });
     this.floor = svg('rect', { x: String(-FAR), y: String(-FAR), width: String(FAR * 3), height: String(FAR) });
@@ -82,7 +81,11 @@ export class Bark {
     const clipped = svg('g', { 'clip-path': 'url(#bark-soles)' });
     this.fill = svg('path', { class: 'bark__fill' });
     this.lines = [0, 1, 2].map(() =>
-      svg('path', { class: 'bark__line', 'stroke-miterlimit': String(MITER_LIMIT) }),
+      svg('path', {
+        class: 'bark__line',
+        'stroke-width': String(STROKE),
+        'stroke-miterlimit': String(MITER_LIMIT),
+      }),
     );
     clipped.append(this.fill, ...this.lines);
     this.body.append(clipped);
@@ -190,32 +193,33 @@ export class Bark {
   private render(frame: Frame, ground: Ground & { y: number }): void {
     const scale = ground.size / HEIGHT;
 
-    const drawing = draw(frame.pose);
+    // Squashing keeps his volume: what he loses in height he gains in width.
+    const drawing = draw(frame.pose, {
+      wide: frame.facing * (1 + (1 - frame.squash) * 0.55),
+      tall: frame.squash,
+    });
     this.fill.setAttribute('d', drawing.fill);
     drawing.lines.forEach((d, i) => this.lines[i]?.setAttribute('d', d));
-    this.hindSole.setAttribute('height', String(FAR - drawing.hindSole));
-    this.foreSole.setAttribute('height', String(FAR - drawing.foreSole));
+    // Everything above the soles: down to one height left of his middle, and
+    // to the other right of it, whichever pair of feet is on that side.
+    const left = drawing.hindSide < 0 ? drawing.hindSole : drawing.foreSole;
+    const right = drawing.hindSide < 0 ? drawing.foreSole : drawing.hindSole;
+    this.soles.setAttribute(
+      'd',
+      `M${-FAR},${-FAR}H${FAR}V${(-right).toFixed(1)}H0V${(-left).toFixed(1)}H${-FAR}Z`,
+    );
     this.floor.setAttribute('height', (FAR + ground.y).toFixed(2));
 
-    // Squashing keeps his volume: what he loses in height he gains in width.
-    const wide = scale * frame.facing * (1 + (1 - frame.squash) * 0.55);
-    const tall = scale * frame.squash;
+    // The only transform is a uniform one, so the line scales with him and
+    // nothing else: every browser then agrees on how far the drawing extends.
     const lean = (frame.pitch * frame.facing * 180) / Math.PI;
     const top = ground.y - frame.lift;
     this.body.setAttribute(
       'transform',
       `translate(${frame.x.toFixed(2)} ${top.toFixed(2)}) ` +
         `rotate(${lean.toFixed(2)} 0 ${(-0.35 * ground.size).toFixed(1)}) ` +
-        `scale(${wide.toFixed(4)} ${tall.toFixed(4)}) translate(${-MIDDLE} 0)`,
+        `scale(${scale.toFixed(5)})`,
     );
-
-    // The stroke is set in screen pixels and never scales, so squashing and
-    // turning change his shape but not his line.
-    const stroke = STROKE * scale;
-    if (stroke !== this.lastStroke) {
-      this.lastStroke = stroke;
-      for (const line of this.lines) line.setAttribute('stroke-width', stroke.toFixed(3));
-    }
 
     // The button follows him: it is what is pressed, and what takes focus.
     const width = ((RIGHT - LEFT) / HEIGHT) * ground.size;

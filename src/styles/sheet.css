@@ -98,6 +98,11 @@
   display: block;
 }
 
+/* The heading's spoken name keeps its own capitals. */
+.wordmark .visually-hidden {
+  text-transform: none;
+}
+
 /* The second line, with the byline beside it. By default the byline sits
    under the line; where the screen is wide enough it hangs off the end of it. */
 .wordmark__row {

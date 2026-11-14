@@ -22,6 +22,8 @@ export const MITER_LIMIT = 1.6;
 export const HEIGHT = 692;
 export const LEFT = -356;
 export const RIGHT = 447;
+/** The middle of his body, between rump and nose. */
+export const MIDDLE = (LEFT + RIGHT) / 2;
 
 /** Each feature turns about its own point. */
 export const NECK = { x: 70, y: -470 } as const;

@@ -1,4 +1,4 @@
-import { BEARD_CORNER, EAR_BASE, NECK, STROKES, type Stroke } from './shape.ts';
+import { BEARD_CORNER, EAR_BASE, MIDDLE, NECK, STROKES, type Stroke } from './shape.ts';
 
 /**
  * Everything that can move in Bark's drawing. At rest every value is zero
@@ -18,6 +18,19 @@ export interface Pose {
   ear: number;
   beard: number;
 }
+
+/**
+ * The whole body's proportions, applied to the drawing's points rather than
+ * as a transform, so that stretching him never stretches his line.
+ */
+export interface Build {
+  /** Horizontal scale about his middle. Negative faces him left; near zero he is mid-turn. */
+  wide: number;
+  /** Vertical scale from the ground. */
+  tall: number;
+}
+
+export const UPRIGHT: Readonly<Build> = { wide: 1, tall: 1 };
 
 export const REST: Readonly<Pose> = {
   hindReach: 0,
@@ -45,8 +58,11 @@ function turn(i: number, pivot: { x: number; y: number }, angle: number): void {
   scratch[i + 1] = pivot.y + dx * sin + dy * cos;
 }
 
-/** Moves a stroke's points into a pose, leaving the result in `scratch`. */
-function place(stroke: Stroke, pose: Pose): number {
+/**
+ * Moves a stroke's points into a pose and a build, leaving the result in
+ * `scratch`, measured from the ground under his middle.
+ */
+function place(stroke: Stroke, pose: Pose, build: Build): number {
   const count = stroke.rest.length / 2;
   for (let p = 0; p < count; p++) {
     const i = p * 2;
@@ -58,6 +74,8 @@ function place(stroke: Stroke, pose: Pose): number {
     turn(i, EAR_BASE, pose.ear * stroke.ear[p]!);
     turn(i, BEARD_CORNER, pose.beard * stroke.beard[p]!);
     turn(i, NECK, pose.head * stroke.head[p]!);
+    scratch[i] = (scratch[i]! - MIDDLE) * build.wide;
+    scratch[i + 1] = scratch[i + 1]! * build.tall;
   }
   return count;
 }
@@ -74,8 +92,14 @@ function beyond(ax: number, ay: number, bx: number, by: number): string {
  * The SVG path of one stroke in a pose. Strokes run on a little past each
  * foot; the caller clips them level with the sole.
  */
-function trace(stroke: Stroke, pose: Pose, continued: boolean, reversed: boolean): string {
-  const count = place(stroke, pose);
+function trace(
+  stroke: Stroke,
+  pose: Pose,
+  build: Build,
+  continued: boolean,
+  reversed: boolean,
+): string {
+  const count = place(stroke, pose, build);
   const s = scratch;
   const last = (count - 1) * 2;
   let d = '';
@@ -114,26 +138,32 @@ export interface Drawing {
   /** Height of each pair of soles above the ground (zero or more). */
   hindSole: number;
   foreSole: number;
+  /** Which side of his middle the hind feet are on: -1 left, 1 right. */
+  hindSide: -1 | 1;
 }
 
-/** Draws Bark in a pose. */
-export function draw(pose: Pose): Drawing {
+/**
+ * Draws Bark in a pose and a build. Coordinates are in the mark's units,
+ * with the origin on the ground under his middle.
+ */
+export function draw(pose: Pose, build: Build = UPRIGHT): Drawing {
   const [back, front, belly] = STROKES as [Stroke, Stroke, Stroke];
   // Around the body: along the back from nose to hind foot, forward under the
   // belly to the forefoot, then up the chest to the beard and across to the nose.
   const fill =
-    trace(back, pose, false, false) +
-    trace(belly, pose, true, true) +
-    trace(front, pose, true, true) +
+    trace(back, pose, build, false, false) +
+    trace(belly, pose, build, true, true) +
+    trace(front, pose, build, true, true) +
     'Z';
   return {
     lines: [
-      trace(back, pose, false, false),
-      trace(front, pose, false, false),
-      trace(belly, pose, false, false),
+      trace(back, pose, build, false, false),
+      trace(front, pose, build, false, false),
+      trace(belly, pose, build, false, false),
     ],
     fill,
-    hindSole: Math.max(0, pose.hindLift),
-    foreSole: Math.max(0, pose.foreLift),
+    hindSole: Math.max(0, pose.hindLift) * build.tall,
+    foreSole: Math.max(0, pose.foreLift) * build.tall,
+    hindSide: build.wide >= 0 ? -1 : 1,
   };
 }

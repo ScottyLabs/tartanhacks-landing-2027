@@ -18,11 +18,24 @@ const last = (frames: Frame[]): Frame => frames[frames.length - 1]!;
 
 test('at rest the drawing is the mark, point for point', () => {
   const drawing = draw(REST);
-  // The back stroke starts at the end of the nose and its first curve ends at the nose's corner.
-  assert.ok(drawing.lines[0].startsWith('M408.6,-428.7C413.0,-446.5 419.8,-467.0 422.4,-486.0'));
-  // Standing, every sole is on the ground.
+  // The back stroke starts at the end of the nose (408.6, -428.7 in the mark,
+  // measured here from his middle at 45.5) and curves up to the nose's corner.
+  assert.ok(drawing.lines[0].startsWith('M363.1,-428.7C367.5,-446.5 374.3,-467.0 376.9,-486.0'));
+  // Standing, every sole is on the ground, and his hind feet are behind him.
   assert.equal(drawing.hindSole, 0);
   assert.equal(drawing.foreSole, 0);
+  assert.equal(drawing.hindSide, -1);
+});
+
+test('squashing and turning move his points, never his line', () => {
+  const upright = draw(REST);
+  const squashed = draw(REST, { wide: 1.1, tall: 0.8 });
+  assert.ok(squashed.lines[0].startsWith('M399.4,-343.0'), 'wider and shorter, point by point');
+  // Facing left mirrors him about his middle and swaps which side his hind feet are on.
+  const turned = draw(REST, { wide: -1, tall: 1 });
+  assert.ok(turned.lines[0].startsWith('M-363.1,-428.7'));
+  assert.equal(turned.hindSide, 1);
+  assert.notEqual(upright.fill, turned.fill);
 });
 
 test('every moving part leaves some of the drawing alone', () => {
