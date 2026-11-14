@@ -49,6 +49,11 @@
   animation-delay: 1300ms;
 }
 
+/* The byline arrives once the wordmark has inked in. */
+.intro .byline {
+  animation: fade-in 360ms linear 1350ms both;
+}
+
 @keyframes draw-band {
   from {
     scale: 0 1;
@@ -80,7 +85,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro :is(.band, .band__half > *, .plate, .countdown) {
+  .intro :is(.band, .band__half > *, .plate, .countdown, .byline) {
     animation: none;
   }
 }
