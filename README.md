@@ -59,9 +59,9 @@ src/styles/             tokens, base, layout, entrance
 
 ### The field
 
-The background is one WebGL 2 canvas behind the page. It draws a sheet of horizontal rules, thickens them wherever the wordmark is, and folds the sheet into mirrored figures where the pointer travels.
+The background is one WebGL 2 canvas behind the page. It draws a sheet of horizontal rules, draws the wordmark into them, and folds the sheet into mirrored figures where the pointer travels.
 
-Above the band the plain rules only pass through: they draw in with the rest of the sheet during the entrance, then leave, so the wordmark's heavy rules sit on white. The sheet is still there underneath, and shows again inside every fold.
+Above the band the plain rules only pass through: they draw in with the rest of the sheet during the entrance, then leave, so the wordmark sits solid on white. The sheet is still there underneath, and shows again inside every fold, where the wordmark breaks into heavy rules.
 
 - **The DOM owns layout.** The wordmark is real text. The field measures where the browser put each glyph and draws the wordmark into the rules at exactly that spot; the text itself stays in place, transparent, for selection and screen readers.
 - **Everything sits on the rule grid.** The distance between two rules is the *pitch*. The field rounds it to whole device pixels so the rules stay sharp, writes the exact value to the `--pitch` custom property, and CSS sizes everything vertical in pitches. Elements marked `data-snap` are nudged so their edges fall between rules.

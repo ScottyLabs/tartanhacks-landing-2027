@@ -1,5 +1,5 @@
 /**
- * Rasterises the wordmark into a coverage mask the field can thicken its
+ * Rasterises the wordmark into a coverage mask the field can draw its
  * rules through. The DOM stays the source of truth for layout: every glyph is
  * drawn where the browser placed it, so the drawn wordmark sits exactly over
  * the (transparent) text.

@@ -32,7 +32,7 @@ uniform vec2 uResolution;
 uniform float uPitch;       // distance between rules
 uniform float uCentre;      // offset of a rule's centre line within one pitch
 uniform float uThin;        // half the width of a plain rule
-uniform float uThick;       // half the width of a rule where the wordmark is
+uniform float uThick;       // half the width of a rule where a fold shows the wordmark
 uniform float uSeam;        // half the width of the cut around a facet
 
 uniform sampler2D uInk;     // coverage of the wordmark
@@ -109,8 +109,12 @@ void main() {
   float plain = rule(q.y, uThin);
   if (!folded) plain *= 1.0 - cleared(p);
 
+  // The wordmark inks in by its rules swelling. On the sheet as it lies they
+  // swell until they meet, and the wordmark is solid. Seen through a fold they
+  // stop short, so a fold is made of lines and nothing else.
   float ink = texture(uInk, (q - uInkRect.xy) / uInkRect.zw).r;
-  float cover = max(plain, rule(q.y, mix(uThin, uThick, uInkGain)) * ink);
+  float heavy = folded ? uThick : 0.5 * uPitch + 1.0;
+  float cover = max(plain, rule(q.y, mix(uThin, heavy, uInkGain)) * ink);
   cover *= revealed(p) * (1.0 - seam);
 
   fragColor = vec4(vec3(1.0 - cover), 1.0);

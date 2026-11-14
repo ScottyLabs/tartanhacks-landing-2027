@@ -65,8 +65,8 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
 }
 
 /**
- * The ruled sheet behind the page: horizontal rules, thickened where the
- * wordmark is, and folded into mirrored figures wherever the pointer travels.
+ * The ruled sheet behind the page: horizontal rules, the wordmark drawn into
+ * them, and the whole folded into mirrored figures wherever the pointer travels.
  */
 export class Field {
   /** Returns null when WebGL 2 is unavailable; the page then falls back to CSS rules. */
