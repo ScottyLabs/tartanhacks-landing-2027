@@ -1,6 +1,5 @@
-import { FacetPool } from './facets.ts';
-import { ID_STEP, rasteriseInk, type InkGlyph } from './ink.ts';
-import { FRAGMENT_SOURCE, MAX_FACETS, MAX_GLYPHS, VERTEX_SOURCE } from './shader.ts';
+import { rasteriseInk } from './ink.ts';
+import { FRAGMENT_SOURCE, VERTEX_SOURCE } from './shader.ts';
 
 export interface FieldOptions {
   /** The element the field covers. Positions are measured from its top left. */
@@ -17,77 +16,16 @@ export interface FieldOptions {
   clearZone: HTMLElement | null;
 }
 
-/*
- * The wordmark is solid at rest. While the pointer is at work each letter
- * opens into a mirrored figure of its own, which turns as the pointer
- * travels; when the pointer rests, the letters close back to solid.
- */
-
-/**
- * How many mirrors each letter's figure has. The count follows the letter's
- * own build: three for the triangle of A, four for the right angles of T and
- * H, six for the diagonals of K and N, twelve for the round C.
- */
-const ORDERS: Readonly<Record<string, number>> = {
-  T: 4,
-  A: 3,
-  R: 5,
-  N: 6,
-  H: 4,
-  C: 12,
-  K: 6,
-  S: 8,
-};
-
-/**
- * Where each letter's figure starts, in wedges. 0 and 0.5 are plain polygons
- * (the second turned by half a wedge), 0.25 is a polygon of twice the sides,
- * and 0.75 is a star. A starts as upright triangles, H as upright squares,
- * C as near-circles; the rest start as stars.
- */
-const STARTS: Readonly<Record<string, number>> = {
-  T: 0.75,
-  A: 0,
-  R: 0.75,
-  N: 0.75,
-  H: 0.5,
-  C: 0.25,
-  K: 0.75,
-  S: 0.75,
-};
-
-/** Radians the figures turn per CSS pixel of pointer travel. */
-const TURN_PER_PIXEL = 0.0028;
-/** Radians per second the figures keep turning on their own while open. */
-const TURN_IDLE = 0.3;
-/** The letters stay open this long after the pointer's last move or press. */
-const OPEN_HOLD_MS = 420;
-/** Time constants for opening and for closing back to solid. */
-const OPEN_RISE_MS = 110;
-const OPEN_FALL_MS = 300;
-
 const UNIFORMS = [
   'uResolution',
   'uPitch',
   'uCentre',
   'uThin',
-  'uThick',
-  'uSeam',
   'uInk',
   'uInkRect',
   'uInkGain',
   'uReveal',
   'uClear',
-  'uFacetCount',
-  'uFacetA',
-  'uFacetB',
-  'uGlyphCount',
-  'uOpen',
-  'uIds',
-  'uIdStep',
-  'uGlyphA',
-  'uGlyphB',
-  'uFigured',
 ] as const;
 type UniformName = (typeof UNIFORMS)[number];
 
@@ -121,8 +59,8 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
 }
 
 /**
- * The ruled sheet behind the page: horizontal rules, the wordmark drawn into
- * them, and the whole folded into mirrored figures wherever the pointer travels.
+ * The ruled sheet behind the page: horizontal rules with the wordmark drawn
+ * into them. It moves once, for the entrance, and is still after that.
  */
 export class Field {
   /** Returns null when WebGL 2 is unavailable; the page then falls back to CSS rules. */
@@ -149,42 +87,18 @@ export class Field {
   private readonly snapTargets: readonly HTMLElement[];
   private readonly clearZone: HTMLElement | null;
   private readonly gl: WebGL2RenderingContext;
-  private readonly pool = new FacetPool();
-  private readonly facetA = new Float32Array(MAX_FACETS * 4);
-  private readonly facetB = new Float32Array(MAX_FACETS * 4);
-  private readonly glyphA = new Float32Array(MAX_GLYPHS * 4);
-  private readonly glyphB = new Float32Array(MAX_GLYPHS * 4);
-  private glyphs: InkGlyph[] = [];
-  /** How far the letters' figures have turned, and how far they are asked to. */
-  private turn = 0;
-  private turnTarget = 0;
-  /** How far the letters are open: 0 solid, 1 fully figured. */
-  private open = 0;
-  /** When the pointer last moved or pressed. */
-  private lastActive = -Infinity;
-  private lastPointer: { x: number; y: number } | null = null;
 
   private uniforms = {} as Record<UniformName, WebGLUniformLocation | null>;
-  private inkTexture: WebGLTexture | null = null;
-  private idTexture: WebGLTexture | null = null;
 
-  /** Backing-store pixels per CSS pixel. */
-  private scale = 1;
-  /** Upper bound on `scale`; lowered if frames run slow. */
-  private scaleCap = 2;
   /** Exact device-pixel size of the canvas, when the browser reports it. */
   private deviceSize: { width: number; height: number } | null = null;
-
   /** Bottom of the clear zone, in backing pixels from the top of the stage. */
   private clearEdge = 0;
 
   private frameId = 0;
   private layoutId = 0;
-  private interactive = false;
   private introStart: number | null = null;
   private introDone = false;
-  private slowFrames = 0;
-  private lastFrame = 0;
   private lost = false;
 
   private constructor(options: FieldOptions, gl: WebGL2RenderingContext) {
@@ -237,18 +151,17 @@ export class Field {
     );
   }
 
-  /** Shows the finished sheet at once, with no entrance and no pointer response. */
+  /** Shows the finished sheet at once, with no entrance. */
   show(): void {
     this.introDone = true;
     this.layout();
   }
 
-  /** Plays the entrance, then responds to the pointer. */
+  /** Plays the entrance. */
   play(): void {
     this.layout();
     this.introStart = performance.now();
-    this.listen();
-    this.wake();
+    this.frameId = requestAnimationFrame(this.frame);
   }
 
   /* ---------- GL resources ---------- */
@@ -273,9 +186,8 @@ export class Field {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-    this.inkTexture = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.inkTexture);
+    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -283,19 +195,6 @@ export class Field {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.uniform1i(this.uniforms.uInk, 0);
     this.clearInk();
-
-    // Glyph ids are looked up texel by texel, never blended.
-    this.idTexture = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.idTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
-    gl.uniform1i(this.uniforms.uIds, 1);
-    gl.uniform1f(this.uniforms.uIdStep, ID_STEP);
-    gl.activeTexture(gl.TEXTURE0);
   }
 
   private clearInk(): void {
@@ -323,18 +222,15 @@ export class Field {
     let box = this.stage.getBoundingClientRect();
     if (box.width === 0 || box.height === 0) return;
 
-    let scale = Math.min(dpr, this.scaleCap);
+    let scale = Math.min(dpr, 2);
     const pixels = box.width * box.height * scale * scale;
     if (pixels > PIXEL_BUDGET) scale *= Math.sqrt(PIXEL_BUDGET / pixels);
-    this.scale = scale;
 
     // Rules are a whole number of backing pixels apart and wide, so they stay
     // perfectly sharp. The exact pitch goes back to CSS for the layout to use.
     const basePitch = parseFloat(getComputedStyle(root).getPropertyValue('--pitch-base')) || 10;
     const pitch = Math.max(4, Math.round(basePitch * scale));
     const thin = Math.max(1, Math.round(scale));
-    let thick = Math.round(pitch * 0.7);
-    if ((thick - thin) % 2 !== 0) thick -= 1;
     const centre = Math.floor((pitch - thin) / 2) + thin / 2;
     const pitchCss = pitch / scale;
     root.style.setProperty('--pitch', `${pitchCss}px`);
@@ -375,8 +271,6 @@ export class Field {
     gl.uniform1f(this.uniforms.uPitch, pitch);
     gl.uniform1f(this.uniforms.uCentre, centre);
     gl.uniform1f(this.uniforms.uThin, thin / 2);
-    gl.uniform1f(this.uniforms.uThick, thick / 2);
-    gl.uniform1f(this.uniforms.uSeam, 1.25 * scale);
 
     this.clearEdge = this.clearZone
       ? (this.clearZone.getBoundingClientRect().bottom - box.top) * scale
@@ -395,101 +289,10 @@ export class Field {
       this.clearInk();
     }
 
-    this.glyphs = mask ? mask.glyphs.slice(0, MAX_GLYPHS) : [];
-    if (mask && this.glyphs.length > 0) {
-      gl.activeTexture(gl.TEXTURE1);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, gl.RED, gl.UNSIGNED_BYTE, mask.ids);
-      gl.activeTexture(gl.TEXTURE0);
-    }
-    this.glyphs.forEach((glyph, i) => {
-      this.glyphA[i * 4] = glyph.x;
-      this.glyphA[i * 4 + 1] = glyph.y;
-    });
-    gl.uniform1i(this.uniforms.uGlyphCount, this.glyphs.length);
-    if (this.glyphs.length > 0) gl.uniform4fv(this.uniforms.uGlyphA, this.glyphA);
-    gl.uniform1f(this.uniforms.uFigured, pitch * 0.39);
-
-    this.pool.unit = Math.min(1.25, Math.max(0.55, Math.min(box.width, window.innerHeight) / 900));
     this.draw(performance.now());
   }
 
-  /* ---------- Pointer ---------- */
-
-  private listen(): void {
-    if (this.interactive) return;
-    this.interactive = true;
-
-    const at = (clientX: number, clientY: number): [number, number] => {
-      const box = this.stage.getBoundingClientRect();
-      return [clientX - box.left, clientY - box.top];
-    };
-
-    window.addEventListener(
-      'pointermove',
-      (event) => {
-        if (event.pointerType === 'touch') return;
-        const [x, y] = at(event.clientX, event.clientY);
-        this.pool.pointerMoved(x, y, performance.now(), true);
-        this.travel(x, y);
-        this.lastActive = performance.now();
-        this.wake();
-      },
-      { passive: true },
-    );
-
-    window.addEventListener(
-      'pointerdown',
-      (event) => {
-        // A press on Bark is his alone.
-        if (event.target instanceof Element && event.target.closest('.bark')) return;
-        const [x, y] = at(event.clientX, event.clientY);
-        this.pool.stamp(x, y, 150 * this.pool.unit, performance.now(), 820);
-        // A press holds the letters open a little longer than a passing move.
-        this.lastActive = performance.now() + 500;
-        this.wake();
-      },
-      { passive: true },
-    );
-
-    // A scrolling finger stops sending pointer events, but keeps sending touches.
-    window.addEventListener(
-      'touchmove',
-      (event) => {
-        const touch = event.touches[0];
-        if (!touch) return;
-        const [x, y] = at(touch.clientX, touch.clientY);
-        this.pool.pointerMoved(x, y, performance.now(), false);
-        this.travel(x, y);
-        this.lastActive = performance.now();
-        this.wake();
-      },
-      { passive: true },
-    );
-
-    const leave = (): void => {
-      this.pool.pointerLeft(performance.now());
-      this.lastPointer = null;
-    };
-    document.documentElement.addEventListener('pointerleave', leave);
-    window.addEventListener('blur', leave);
-  }
-
-  /** Pointer travel turns the letters' figures. */
-  private travel(x: number, y: number): void {
-    const last = this.lastPointer;
-    this.lastPointer = { x, y };
-    if (!last) return;
-    const distance = Math.hypot(x - last.x, y - last.y);
-    if (distance < 200) this.turnTarget += distance * TURN_PER_PIXEL;
-  }
-
-  /* ---------- Frames ---------- */
-
-  private wake(): void {
-    if (this.frameId || this.lost) return;
-    this.lastFrame = 0;
-    this.frameId = requestAnimationFrame(this.frame);
-  }
+  /* ---------- Frames: only the entrance needs them ---------- */
 
   private readonly frame = (now: number): void => {
     this.frameId = 0;
@@ -498,69 +301,10 @@ export class Field {
     if (this.introStart !== null && now - this.introStart >= INTRO_MS) {
       this.introStart = null;
       this.introDone = true;
-      this.wink(now);
     }
-    this.pool.update(now);
-    const lettersBusy = this.animateLetters(now);
     this.draw(now);
-    this.watchFrameRate(now);
-
-    if (this.introStart !== null || this.pool.active || lettersBusy) {
-      this.frameId = requestAnimationFrame(this.frame);
-    }
+    if (this.introStart !== null) this.frameId = requestAnimationFrame(this.frame);
   };
-
-  /**
-   * Opens the letters while the pointer is at work, closes them when it
-   * rests, and keeps their figures turning. Returns whether another frame
-   * is needed.
-   */
-  private animateLetters(now: number): boolean {
-    const elapsed = this.lastFrame ? Math.min(64, now - this.lastFrame) : 16;
-
-    const wanted = now - this.lastActive < OPEN_HOLD_MS ? 1 : 0;
-    const pace = wanted > this.open ? OPEN_RISE_MS : OPEN_FALL_MS;
-    this.open += (wanted - this.open) * (1 - Math.exp(-elapsed / pace));
-    if (Math.abs(wanted - this.open) < 0.004) this.open = wanted;
-
-    // The figures drift on their own while open, and ease toward wherever
-    // the pointer's travel has turned them.
-    this.turnTarget += (elapsed / 1000) * TURN_IDLE * this.open;
-    this.turn += (this.turnTarget - this.turn) * (1 - Math.exp(-elapsed / 140));
-
-    return this.open > 0 || wanted > 0;
-  }
-
-  /**
-   * The last beat of the entrance: one fold opens over the end of the
-   * wordmark and closes again. Skipped if the pointer is already at work.
-   */
-  private wink(now: number): void {
-    const line = this.inkLines.at(-1);
-    if (!line || this.pool.active) return;
-    const origin = this.stage.getBoundingClientRect();
-    const box = line.getBoundingClientRect();
-    this.pool.stamp(
-      box.left - origin.left + box.width * 0.8,
-      box.top - origin.top + box.height * 0.5,
-      box.height * 0.7,
-      now,
-      760,
-    );
-  }
-
-  /** If folding the sheet runs slow at this resolution, draw fewer pixels. */
-  private watchFrameRate(now: number): void {
-    const elapsed = this.lastFrame ? now - this.lastFrame : 0;
-    this.lastFrame = now;
-    if (!this.pool.active || elapsed === 0 || elapsed > 250) return;
-    this.slowFrames = elapsed > 30 ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 1);
-    if (this.slowFrames > 20 && this.scaleCap > 1) {
-      this.slowFrames = 0;
-      this.scaleCap = Math.max(1, this.scaleCap - 0.5);
-      this.scheduleLayout();
-    }
-  }
 
   private draw(now: number): void {
     const gl = this.gl;
@@ -582,27 +326,6 @@ export class Field {
     gl.uniform3f(this.uniforms.uReveal, reveal, width / 2, width / 2 + 2);
     gl.uniform2f(this.uniforms.uClear, this.clearEdge, clear);
     gl.uniform1f(this.uniforms.uInkGain, inkGain);
-
-    gl.uniform1f(this.uniforms.uOpen, this.glyphs.length > 0 ? this.open : 0);
-    if (this.open > 0 && this.glyphs.length > 0) {
-      this.glyphs.forEach((glyph, i) => {
-        const order = ORDERS[glyph.char] ?? 6;
-        const wedge = (Math.PI * 2) / order;
-        const start = STARTS[glyph.char] ?? 0.25;
-        // Neighbours turn in opposite directions.
-        const direction = i % 2 === 0 ? 1 : -1;
-        this.glyphB[i * 4] = order;
-        this.glyphB[i * 4 + 1] = Math.PI / 2 - wedge * start + direction * this.turn;
-      });
-      gl.uniform4fv(this.uniforms.uGlyphB, this.glyphB);
-    }
-
-    const count = this.pool.write(this.facetA, this.facetB, now, this.scale);
-    gl.uniform1i(this.uniforms.uFacetCount, count);
-    if (count > 0) {
-      gl.uniform4fv(this.uniforms.uFacetA, this.facetA);
-      gl.uniform4fv(this.uniforms.uFacetB, this.facetB);
-    }
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }

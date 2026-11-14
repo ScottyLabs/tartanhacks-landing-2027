@@ -57,24 +57,23 @@ src/bark/               Bark, the ScottyLabs dog
   mind.ts                 how he behaves: chase, turn, stride, jump
   bark.ts                 puts him on the page and runs him
 src/field/              the drawn background
-  field.ts                layout, pointer input, frame loop, the letters' figures
-  facets.ts               the folds that open where the pointer travels
-  ink.ts                  rasterises the wordmark from the DOM, and which letter owns each pixel
+  field.ts                layout and the entrance
+  ink.ts                  rasterises the wordmark from the DOM
   shader.ts               the fragment shader that draws it all
 src/styles/             tokens, base, layout, entrance
 ```
 
 ### The field
 
-The background is one WebGL 2 canvas behind the page. It draws a sheet of horizontal rules, draws the wordmark into them, and folds the sheet into mirrored figures where the pointer travels.
+The background is one WebGL 2 canvas behind the page. It draws a sheet of horizontal rules with the wordmark drawn into it. It moves once, for the entrance, and is still after that:
 
-Above the band the plain rules only pass through: they draw in with the rest of the sheet during the entrance, then leave, so the wordmark sits solid on white. The sheet is still there underneath, and shows again inside every fold, where the wordmark breaks into heavy rules.
+1. The rules draw outward from the centre of the page.
+2. Where the wordmark is, the rules swell until they meet, and the wordmark is solid.
+3. Above the band the plain rules leave again, each one running off the edges the way it came, so the wordmark sits on white.
 
-The wordmark is solid only at rest. While the pointer moves, or after a press or tap, each letter opens into a mirrored figure of its own, cut to the letter's shape. The number of mirrors follows the letter: three for A, four for T and H, twelve for the round C. The figures turn as the pointer travels, and close back to solid when it rests.
-
-- **The DOM owns layout.** The wordmark is real text. The field measures where the browser put each glyph and draws the wordmark into the rules at exactly that spot; the text itself stays in place, transparent, for selection and screen readers.
+- **The DOM owns layout.** The wordmark is real text. The field measures where the browser put each glyph and draws the wordmark at exactly that spot; the text itself stays in place, transparent, for selection and screen readers.
 - **Everything sits on the rule grid.** The distance between two rules is the *pitch*. The field rounds it to whole device pixels so the rules stay sharp, writes the exact value to the `--pitch` custom property, and CSS sizes everything vertical in pitches. Elements marked `data-snap` are nudged so their edges fall between rules.
-- **It only draws when something changes.** The frame loop runs during the entrance and while a fold is open, then stops.
+- **It only draws when something changes.** Frames run during the entrance, then stop.
 
 ### Bark
 
@@ -93,21 +92,29 @@ The page works at every level of support:
 
 | Situation | Result |
 |---|---|
-| Reduced motion requested | The finished sheet, drawn once. No entrance, no pointer response. |
+| Reduced motion requested | The finished sheet, drawn once, with no entrance. Bark stands still. |
 | No WebGL 2 | A solid wordmark on white, CSS rules below the band. The countdown still runs. |
 | No JavaScript | A solid wordmark on white, CSS rules below the band, and the drop date in text. |
 
 ## Deploy
 
-The repo ships a `Dockerfile` that builds the site and serves it with nginx on port 80, with a `/healthz` check and a strict Content-Security-Policy. It follows the conventions of [Sheltie](https://github.com/scottylabs-labrador/sheltie), ScottyLabs' deployment platform:
+The repo ships a `Dockerfile` that builds the site and serves it with nginx, with a strict Content-Security-Policy. nginx listens on `$PORT`, or on 80 when that is not set, and answers health checks at `/health` and `/healthz`.
+
+The page sets no inline styles or scripts in its markup, so it runs under `style-src 'self'; script-src 'self'`. Keep it that way when editing, or nginx's policy will block the change.
+
+### Railway
+
+The site runs as the `2027` service of the `TartanHacks-History` project, next to the earlier years. `railway.json` tells Railway to build the Dockerfile and to check `/health`; Railway provides `PORT`. The service deploys from this repo's `main` branch.
+
+### Sheltie
+
+For a preview on [Sheltie](https://github.com/scottylabs-labrador/sheltie), ScottyLabs' deployment platform:
 
 - Source: this repo, as a public Git repository (or through the `sheltie-scottylabs` GitHub App, which adds deploy-on-push)
 - Build pack: Dockerfile
 - Ports exposes: `80`
 - Health check path: `/healthz`
 - Memory limit: `64m`
-
-The page sets no inline styles or scripts in its markup, so it runs under `style-src 'self'; script-src 'self'`. Keep it that way when editing, or nginx's policy will block the change.
 
 ## Credits
 
