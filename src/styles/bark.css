@@ -9,11 +9,14 @@
   margin-top: calc(var(--pitch) * -1);
 }
 
-/* A layer over the whole stage; only the button on it takes the pointer. */
+/* A layer over the whole stage; only the button on it takes the pointer.
+   What he holds may reach past the edge of the page, and is cut off there
+   rather than making the page scroll sideways. */
 .bark {
   position: absolute;
   inset: 0;
   z-index: 2;
+  overflow: hidden;
   pointer-events: none;
 }
 
@@ -40,6 +43,21 @@
   stroke: var(--ink);
   stroke-linecap: butt;
   stroke-linejoin: miter;
+}
+
+/* The scorecard he holds up as a judge: white, like him, with the score in
+   the wordmark's own type. */
+.bark__plate {
+  fill: var(--paper);
+}
+
+.bark__score {
+  fill: var(--ink);
+  font-family: var(--font-wide);
+  font-weight: 900;
+  font-stretch: 125%;
+  letter-spacing: -0.03em;
+  text-anchor: middle;
 }
 
 /* Follows him around: the thing that is pressed, and that takes focus. */

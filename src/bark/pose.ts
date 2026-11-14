@@ -130,6 +130,21 @@ function trace(
   return d;
 }
 
+/** Between the end of his nose and the tip of his beard, at rest. */
+const MOUTH = { x: 400, y: -388 } as const;
+
+/** Where his mouth is in a pose and a build: it turns with his head. */
+function mouthIn(pose: Pose, build: Build): { x: number; y: number } {
+  const dx = MOUTH.x - NECK.x;
+  const dy = MOUTH.y - NECK.y;
+  const cos = Math.cos(pose.head);
+  const sin = Math.sin(pose.head);
+  return {
+    x: (NECK.x + dx * cos - dy * sin - MIDDLE) * build.wide,
+    y: (NECK.y + dx * sin + dy * cos) * build.tall,
+  };
+}
+
 export interface Drawing {
   /** One path per stroke: back, front, belly. */
   lines: [string, string, string];
@@ -140,6 +155,8 @@ export interface Drawing {
   foreSole: number;
   /** Which side of his middle the hind feet are on: -1 left, 1 right. */
   hindSide: -1 | 1;
+  /** The middle of his mouth, where he can hold something. */
+  mouth: { x: number; y: number };
 }
 
 /**
@@ -165,5 +182,6 @@ export function draw(pose: Pose, build: Build = UPRIGHT): Drawing {
     hindSole: Math.max(0, pose.hindLift) * build.tall,
     foreSole: Math.max(0, pose.foreLift) * build.tall,
     hindSide: build.wide >= 0 ? -1 : 1,
+    mouth: mouthIn(pose, build),
   };
 }

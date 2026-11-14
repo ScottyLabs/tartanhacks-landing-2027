@@ -18,6 +18,17 @@ export interface Ground {
   size: number;
 }
 
+/** A part Bark can dress for. */
+export type Role = 'judge' | 'hacker';
+
+/** What he has with him, each from 0 (put away) to 1 (fully out). */
+export interface Props {
+  /** A judge's scorecard, held up in his mouth. */
+  card: number;
+  /** A laptop, open on the ground in front of him. */
+  laptop: number;
+}
+
 /** What to draw for one frame. */
 export interface Frame {
   /** His middle, along the ground. */
@@ -31,6 +42,7 @@ export interface Frame {
   /** Lean of the whole body in radians; positive tips the nose down. */
   pitch: number;
   pose: Pose;
+  props: Props;
 }
 
 const TAU = Math.PI * 2;
@@ -92,6 +104,14 @@ export class Mind {
   private readonly beard = new Spring(0);
   private readonly gaze = new Spring(0);
 
+  /** The part he is dressed for, if any, and how far out its props are. */
+  private role: Role | null = null;
+  private readonly card = new Spring(0);
+  private laptop = 0;
+  /** Time spent at the keys, and how hard he is typing just now (0 pausing .. 1). */
+  private typing = 0;
+  private keys = 0;
+
   private pointer: { x: number; y: number } | null = null;
   private clock = 0;
   private nextTwitch = 2;
@@ -104,6 +124,13 @@ export class Mind {
   /** Tells Bark where the pointer is: x along the ground, y above it. Null when unknown. */
   watch(pointer: { x: number; y: number } | null): void {
     this.pointer = pointer;
+  }
+
+  /** Dresses Bark for a part, or with null lets him be himself again. */
+  dress(role: Role | null): void {
+    if (role === this.role) return;
+    this.role = role;
+    if (role) this.ear.velocity += 1.6; // his ear pricks: something to do
   }
 
   /** Asks for a jump. Ignored unless he is standing on the ground. */
@@ -120,7 +147,10 @@ export class Mind {
       this.gait < 0.01 &&
       Math.abs(this.facing - this.heading) < 0.01 &&
       Math.abs(this.squash.velocity) < 0.02 &&
-      Math.abs(this.ear.velocity) < 0.05
+      Math.abs(this.ear.velocity) < 0.05 &&
+      this.role === null &&
+      this.card.value < 0.003 &&
+      this.laptop === 0
     );
   }
 
@@ -135,7 +165,9 @@ export class Mind {
     if (this.pointer && this.mode !== 'crouching') {
       const goal = clamp(this.pointer.x, ground.left, ground.right);
       const gap = goal - this.x;
-      const reach = STOP_WITHIN * size;
+      // Dressed for a part he holds his ground while the pointer wanders
+      // nearby, so a small move of the mouse does not make him pack up.
+      const reach = (this.role ? 0.9 : STOP_WITHIN) * size;
       if (Math.abs(gap) > reach) {
         want = Math.sign(gap) * Math.min(top, (Math.abs(gap) - reach * 0.5) * 4.2);
       }
@@ -211,6 +243,26 @@ export class Mind {
     }
     this.gaze.step(look, 60, 13, dt);
 
+    // --- Dressing the part. The card comes up at once and he may carry it;
+    // the laptop only opens once he has stopped, and shuts when he moves on.
+    this.card.step(this.role === 'judge' ? 1 : 0, 170, 17, dt);
+    if (this.card.value < 0) {
+      this.card.value = 0;
+      this.card.velocity = 0;
+    }
+    const settled = this.mode === 'grounded' && this.gait < 0.12;
+    const wanted = this.role === 'hacker' && settled ? 1 : 0;
+    this.laptop += (wanted - this.laptop) * toward(dt, wanted ? 0.11 : 0.06);
+    if (this.laptop < 0.003) this.laptop = 0;
+    // His paws come up once the lid is most of the way open.
+    const atKeys = clamp((this.laptop - 0.55) / 0.45, 0, 1);
+    if (atKeys > 0) this.typing += dt;
+    // He types in bursts, with short pauses to think.
+    const bursting = Math.sin(this.typing * 3.1) + Math.sin(this.typing * 1.3) > -0.9 ? 1 : 0;
+    this.keys += (bursting - this.keys) * toward(dt, 0.05);
+    const tap = 0.5 + 0.5 * Math.sin(this.typing * TAU * 9.5);
+    const held = clamp(this.card.value, 0, 1);
+
     // --- Compose the pose.
     const pose: Pose = { ...REST };
     const reach = (20 + 38 * pace) * this.gait;
@@ -230,9 +282,18 @@ export class Mind {
     pose.hindLift += 26 * tuck;
     pose.foreLift += 30 * tuck;
 
+    // At the laptop his forepaws come up onto the near edge of the keys and
+    // drum on them. The lift is kept small against the length of his legs.
+    pose.foreReach += 16 * atKeys;
+    pose.foreLift += atKeys * (20 + 20 * tap * this.keys);
+
     const bounce = Math.sin(this.stride * 2);
     pose.head = -this.gaze.value + this.gait * (0.03 * bounce + 0.045 * pace) - 0.12 * flight;
+    // He looks down at the screen and nods as he types; with the card he holds his head up.
+    pose.head += 0.12 * this.laptop + 0.026 * atKeys * this.keys * Math.sin(this.typing * TAU * 4.75);
+    pose.head -= 0.07 * held;
     pose.ear = this.ear.value + this.gait * 0.05 * Math.sin(this.stride * 2 - 1);
+    pose.ear += 0.03 * atKeys * this.keys * Math.sin(this.typing * TAU * 9.5 + 1);
     pose.beard = this.beard.value + this.gait * 0.07 * Math.sin(this.stride * 2 + 0.7);
 
     // The body rises between footfalls, a little more the faster he goes.
@@ -245,6 +306,7 @@ export class Mind {
       squash: clamp(this.squash.value, 0.7, 1.2),
       pitch: 0.05 * pace * this.gait - 0.09 * flight,
       pose,
+      props: { card: clamp(this.card.value, 0, 1.15), laptop: this.laptop },
     };
   }
 }

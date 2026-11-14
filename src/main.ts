@@ -37,7 +37,13 @@ async function main(): Promise<void> {
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const band = document.getElementById('band');
   const runway = document.getElementById('runway');
-  const bark = stage && band && runway ? new Bark({ stage, ground: band, sizer: runway }) : null;
+  // He dresses for whichever sign-up link the pointer is over.
+  const parts = [
+    { element: band?.querySelector<HTMLElement>('.band__half--left'), role: 'hacker' as const },
+    { element: band?.querySelector<HTMLElement>('.band__half--right'), role: 'judge' as const },
+  ].flatMap((part) => (part.element ? [{ element: part.element, role: part.role }] : []));
+  const bark =
+    stage && band && runway ? new Bark({ stage, ground: band, sizer: runway, parts }) : null;
 
   if (!field) {
     // Bark does not need the field: he is drawn in SVG.

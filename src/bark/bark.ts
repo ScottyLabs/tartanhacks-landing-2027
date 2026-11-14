@@ -1,5 +1,6 @@
-import { Mind, type Frame, type Ground } from './mind.ts';
+import { Mind, type Frame, type Ground, type Role } from './mind.ts';
 import { draw, REST } from './pose.ts';
+import { drawProps } from './props.ts';
 import { HEIGHT, LEFT, MITER_LIMIT, RIGHT, STROKE } from './shape.ts';
 
 export interface BarkOptions {
@@ -9,6 +10,11 @@ export interface BarkOptions {
   ground: HTMLElement;
   /** An element as tall as Bark should be. */
   sizer: HTMLElement;
+  /**
+   * Elements Bark dresses for while the pointer is over them, or while they
+   * have the keyboard's focus.
+   */
+  parts?: readonly { element: HTMLElement; role: Role }[];
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -41,7 +47,16 @@ export class Bark {
   private readonly lines: SVGPathElement[];
   private readonly soles: SVGPathElement;
   private readonly floor: SVGRectElement;
+  private readonly stick: SVGPathElement;
+  private readonly plate: SVGPathElement;
+  private readonly score: SVGTextElement;
+  private readonly laptop: SVGPathElement;
   private readonly button: HTMLButtonElement;
+
+  private readonly parts: readonly { element: HTMLElement; role: Role }[];
+  /** The part the pointer or the keyboard is asking for, and the element in focus. */
+  private hovered: Role | null = null;
+  private focused: { element: HTMLElement; role: Role } | null = null;
 
   private mind: Mind | null = null;
   /** The pointer in viewport coordinates, once it has been seen. */
@@ -55,6 +70,7 @@ export class Bark {
     this.stage = options.stage;
     this.ground = options.ground;
     this.sizer = options.sizer;
+    this.parts = options.parts ?? [];
 
     this.root = document.createElement('div');
     this.root.className = 'bark';
@@ -88,7 +104,17 @@ export class Bark {
       }),
     );
     clipped.append(this.fill, ...this.lines);
-    this.body.append(clipped);
+
+    // What he can have with him, drawn in his line. They sit outside the
+    // clip that cuts his feet level, and are empty until he is dressed.
+    const line = { class: 'bark__line', 'stroke-width': String(STROKE), 'stroke-miterlimit': String(MITER_LIMIT) };
+    this.laptop = svg('path', line);
+    this.stick = svg('path', line);
+    this.plate = svg('path', { ...line, class: 'bark__line bark__plate' });
+    this.score = svg('text', { class: 'bark__score' });
+    this.score.textContent = '10';
+
+    this.body.append(clipped, this.laptop, this.stick, this.plate, this.score);
     grounded.append(this.body);
     art.append(defs, grounded);
 
@@ -113,6 +139,7 @@ export class Bark {
           squash: 1,
           pitch: 0,
           pose: REST,
+          props: { card: 0, laptop: 0 },
         },
         ground,
       );
@@ -148,6 +175,24 @@ export class Bark {
     // A click covers mouse, touch and keyboard alike.
     this.button.addEventListener('click', () => this.mind?.jump());
 
+    // He dresses for a part while the pointer is over its element. A finger
+    // does not hover, so touch is left out. Keyboard focus counts too, and
+    // brings him over to the element.
+    for (const part of this.parts) {
+      part.element.addEventListener('pointerenter', (event) => {
+        if (event.pointerType !== 'touch') this.hovered = part.role;
+      });
+      part.element.addEventListener('pointerleave', () => {
+        if (this.hovered === part.role) this.hovered = null;
+      });
+      part.element.addEventListener('focus', () => {
+        if (part.element.matches(':focus-visible')) this.focused = part;
+      });
+      part.element.addEventListener('blur', () => {
+        if (this.focused === part) this.focused = null;
+      });
+    }
+
     this.lastStep = performance.now();
     requestAnimationFrame(this.frame);
   }
@@ -179,7 +224,12 @@ export class Bark {
     this.lastStep = now;
 
     const ground = this.measure();
-    if (this.pointer) {
+    mind.dress(this.hovered ?? this.focused?.role ?? null);
+    if (this.focused && !this.hovered) {
+      // With the keyboard there is no pointer to follow: go to the element.
+      const box = this.focused.element.getBoundingClientRect();
+      mind.watch({ x: box.left + box.width / 2 - ground.originX, y: 0 });
+    } else if (this.pointer) {
       mind.watch({
         x: this.pointer.x - ground.originX,
         y: ground.y - (this.pointer.y - ground.originY),
@@ -209,6 +259,22 @@ export class Bark {
       `M${-FAR},${-FAR}H${FAR}V${(-right).toFixed(1)}H0V${(-left).toFixed(1)}H${-FAR}Z`,
     );
     this.floor.setAttribute('height', (FAR + ground.y).toFixed(2));
+
+    const build = { wide: frame.facing * (1 + (1 - frame.squash) * 0.55), tall: frame.squash };
+    const props = drawProps(frame.props, drawing.mouth, frame.pose.head, build);
+    this.laptop.setAttribute('d', props.laptop);
+    this.stick.setAttribute('d', props.stick);
+    this.plate.setAttribute('d', props.plate);
+    // The numerals are set upright on the plate and never mirrored, whichever
+    // way he faces; their baseline sits so that they are centred on it.
+    const { x, y, tilt, size, squeeze } = props.score;
+    this.score.setAttribute('visibility', size > 1 ? 'visible' : 'hidden');
+    this.score.setAttribute('font-size', size.toFixed(1));
+    this.score.setAttribute(
+      'transform',
+      `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${tilt.toFixed(2)}) ` +
+        `scale(${squeeze.toFixed(3)} 1) translate(0 ${(size * 0.36).toFixed(1)})`,
+    );
 
     // The only transform is a uniform one, so the line scales with him and
     // nothing else: every browser then agrees on how far the drawing extends.
