@@ -1,5 +1,6 @@
-/* Without scripting there is no drawn field, so rule the sheet with CSS. */
-.stage {
+/* Without scripting there is no drawn field, so rule the lower part of the
+   sheet with CSS. The top stays white around the wordmark. */
+.sheet__bottom {
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0 4.5px,

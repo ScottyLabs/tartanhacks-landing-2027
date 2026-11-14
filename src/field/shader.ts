@@ -13,6 +13,10 @@ void main() {
  * pixels with the origin at the top left, so a rule that is a whole number of
  * pixels wide lands exactly on the pixel grid.
  *
+ * Above a boundary the plain rules are only passing through: they draw in
+ * with the rest of the sheet, then leave, and the wordmark's heavy rules stay
+ * on white. The sheet itself is still there, and shows wherever it is folded.
+ *
  * A facet is a regular polygon. Inside it, the sheet is folded: the angle
  * around the facet's centre is reflected into a single wedge, so every wedge
  * shows a mirror image of its neighbour. Facets are listed topmost first and
@@ -36,6 +40,7 @@ uniform vec4 uInkRect;      // x, y, width, height of the area uInk covers
 uniform float uInkGain;     // 0..1, how far the wordmark has inked in
 
 uniform vec3 uReveal;       // progress 0..1, axis x, half span
+uniform vec2 uClear;        // boundary y, progress 0..1 of plain rules leaving above it
 
 uniform int uFacetCount;
 uniform vec4 uFacetA[MAX_FACETS];  // centre x, centre y, circumradius, order
@@ -49,20 +54,34 @@ float rule(float y, float halfWidth) {
   return clamp(halfWidth - d + 0.5, 0.0, 1.0);
 }
 
-// Rules draw outward from the vertical axis, each row starting at its own moment.
-float revealed(vec2 p) {
-  if (uReveal.x >= 1.0) return 1.0;
+// How far a point travelling outward from the vertical axis has got along
+// this row, in pixels. Each row starts at its own moment.
+float reach(vec2 p, float progress) {
   float row = floor(p.y / uPitch);
   float delay = fract(sin(row * 12.9898) * 43758.5453) * 0.42;
-  float t = clamp(uReveal.x * 1.42 - delay, 0.0, 1.0);
-  t = 1.0 - pow(1.0 - t, 3.0);
-  return clamp(t * uReveal.z - abs(p.x - uReveal.y) + 0.5, 0.0, 1.0);
+  float t = clamp(progress * 1.42 - delay, 0.0, 1.0);
+  return (1.0 - pow(1.0 - t, 3.0)) * uReveal.z;
+}
+
+// Rules draw outward from the axis: a row shows as far as its head has reached.
+float revealed(vec2 p) {
+  if (uReveal.x >= 1.0) return 1.0;
+  return clamp(reach(p, uReveal.x) - abs(p.x - uReveal.y) + 0.5, 0.0, 1.0);
+}
+
+// Above the boundary a plain rule's tail follows its head out to the edges,
+// so the rule leaves the way it came. Returns how much of it is gone.
+float cleared(vec2 p) {
+  if (p.y >= uClear.x || uClear.y <= 0.0) return 0.0;
+  if (uClear.y >= 1.0) return 1.0;
+  return clamp(reach(p, uClear.y) - abs(p.x - uReveal.y) + 0.5, 0.0, 1.0);
 }
 
 void main() {
   vec2 p = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
   vec2 q = p;
   float seam = 0.0;
+  bool folded = false;
 
   for (int i = 0; i < MAX_FACETS; i++) {
     if (i >= uFacetCount) break;
@@ -82,11 +101,16 @@ void main() {
 
     float s = theta + b.y;
     q = a.xy + r * vec2(cos(s), sin(s)) + b.zw;
+    folded = true;
     break;
   }
 
+  // A fold always shows the whole sheet; elsewhere the plain rules may have left.
+  float plain = rule(q.y, uThin);
+  if (!folded) plain *= 1.0 - cleared(p);
+
   float ink = texture(uInk, (q - uInkRect.xy) / uInkRect.zw).r;
-  float cover = max(rule(q.y, uThin), rule(q.y, mix(uThin, uThick, uInkGain)) * ink);
+  float cover = max(plain, rule(q.y, mix(uThin, uThick, uInkGain)) * ink);
   cover *= revealed(p) * (1.0 - seam);
 
   fragColor = vec4(vec3(1.0 - cover), 1.0);

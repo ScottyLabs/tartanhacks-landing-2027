@@ -10,6 +10,11 @@ export interface FieldOptions {
   inkLines: readonly HTMLElement[];
   /** Elements whose top edge is nudged onto the rule grid. */
   snapTargets: readonly HTMLElement[];
+  /**
+   * The part of the sheet, measured from the top of the stage to this
+   * element's bottom edge, that the plain rules leave after drawing in.
+   */
+  clearZone: HTMLElement | null;
 }
 
 const UNIFORMS = [
@@ -23,6 +28,7 @@ const UNIFORMS = [
   'uInkRect',
   'uInkGain',
   'uReveal',
+  'uClear',
   'uFacetCount',
   'uFacetA',
   'uFacetB',
@@ -34,7 +40,10 @@ const REVEAL_MS = 1150;
 /** The wordmark starts inking in, and how long it takes. */
 const INK_DELAY_MS = 380;
 const INK_MS = 950;
-const INTRO_MS = Math.max(REVEAL_MS, INK_DELAY_MS + INK_MS);
+/** The plain rules start leaving the clear zone, and how long they take. */
+const CLEAR_DELAY_MS = 1020;
+const CLEAR_MS = 900;
+const INTRO_MS = Math.max(REVEAL_MS, INK_DELAY_MS + INK_MS, CLEAR_DELAY_MS + CLEAR_MS);
 
 /** Never draw more backing pixels than this, however large or dense the screen. */
 const PIXEL_BUDGET = 16_000_000;
@@ -82,6 +91,7 @@ export class Field {
   private readonly canvas: HTMLCanvasElement;
   private readonly inkLines: readonly HTMLElement[];
   private readonly snapTargets: readonly HTMLElement[];
+  private readonly clearZone: HTMLElement | null;
   private readonly gl: WebGL2RenderingContext;
   private readonly pool = new FacetPool();
   private readonly facetA = new Float32Array(MAX_FACETS * 4);
@@ -97,6 +107,9 @@ export class Field {
   /** Exact device-pixel size of the canvas, when the browser reports it. */
   private deviceSize: { width: number; height: number } | null = null;
 
+  /** Bottom of the clear zone, in backing pixels from the top of the stage. */
+  private clearEdge = 0;
+
   private frameId = 0;
   private layoutId = 0;
   private interactive = false;
@@ -111,6 +124,7 @@ export class Field {
     this.canvas = options.canvas;
     this.inkLines = options.inkLines;
     this.snapTargets = options.snapTargets;
+    this.clearZone = options.clearZone;
     this.gl = gl;
 
     this.build();
@@ -283,6 +297,10 @@ export class Field {
     gl.uniform1f(this.uniforms.uThick, thick / 2);
     gl.uniform1f(this.uniforms.uSeam, 1.25 * scale);
 
+    this.clearEdge = this.clearZone
+      ? (this.clearZone.getBoundingClientRect().bottom - box.top) * scale
+      : 0;
+
     const mask = rasteriseInk(
       this.inkLines,
       this.stage,
@@ -413,15 +431,19 @@ export class Field {
 
     let reveal = 0;
     let inkGain = 0;
+    let clear = 0;
     if (this.introDone) {
       reveal = 1;
       inkGain = 1;
+      clear = 1;
     } else if (this.introStart !== null) {
       const elapsed = now - this.introStart;
       reveal = clamp01(elapsed / REVEAL_MS);
       inkGain = easeOutCubic(clamp01((elapsed - INK_DELAY_MS) / INK_MS));
+      clear = clamp01((elapsed - CLEAR_DELAY_MS) / CLEAR_MS);
     }
     gl.uniform3f(this.uniforms.uReveal, reveal, width / 2, width / 2 + 2);
+    gl.uniform2f(this.uniforms.uClear, this.clearEdge, clear);
     gl.uniform1f(this.uniforms.uInkGain, inkGain);
 
     const count = this.pool.write(this.facetA, this.facetB, now, this.scale);

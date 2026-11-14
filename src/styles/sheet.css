@@ -18,12 +18,13 @@
   pointer-events: none;
 }
 
-/* When the field cannot be drawn, rule the sheet with CSS instead. */
+/* When the field cannot be drawn, rule the lower part of the sheet with CSS
+   instead. The top stays white, as it does once the field's rules have left. */
 .no-field .field {
   display: none;
 }
 
-.no-field .stage {
+.no-field .sheet__bottom {
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0 calc(var(--pitch) / 2 - 0.5px),

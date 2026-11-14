@@ -26,6 +26,7 @@ async function main(): Promise<void> {
           canvas,
           inkLines: [...stage.querySelectorAll<HTMLElement>('.wordmark__line')],
           snapTargets: [...stage.querySelectorAll<HTMLElement>('[data-snap]')],
+          clearZone: stage.querySelector<HTMLElement>('.sheet__top'),
         })
       : null;
 
