@@ -99,6 +99,8 @@ export interface Stroke {
   readonly head: Float32Array;
   readonly ear: Float32Array;
   readonly beard: Float32Array;
+  /** How far each point goes down with his head when he lays it on the ground. */
+  readonly lay: Float32Array;
   /** How far each point follows a pair of feet forward and back, and up. */
   readonly hindReach: Float32Array;
   readonly foreReach: Float32Array;
@@ -115,6 +117,7 @@ interface Weights {
   head: Weigh;
   ear: Weigh;
   beard: Weigh;
+  lay: Weigh;
   /** How far a point follows the feet on its own side of the body. */
   leg: Weigh;
   /** Set when reaching is shared out differently from lifting. */
@@ -144,6 +147,7 @@ function build(
     head: new Float32Array(count),
     ear: new Float32Array(count),
     beard: new Float32Array(count),
+    lay: new Float32Array(count),
     hindReach: new Float32Array(count),
     foreReach: new Float32Array(count),
     hindLift: new Float32Array(count),
@@ -160,6 +164,7 @@ function build(
     stroke.head[i] = weights.head(x, y, section);
     stroke.ear[i] = weights.ear(x, y, section);
     stroke.beard[i] = weights.beard(x, y, section);
+    stroke.lay[i] = weights.lay(x, y, section);
     const leg = weights.leg(x, y, section);
     if (x < 0) stroke.hindLift[i] = leg;
     else stroke.foreLift[i] = leg;
@@ -184,6 +189,9 @@ export const STROKES: readonly Stroke[] = [
       ear: (x, y, section) =>
         section === 1 || section === 2 ? 1 - smooth(45, 165, distance(x, y, EAR_TIP)) : 0,
       beard: none,
+      // Laid down, the head goes as one piece; the back of the neck stretches
+      // from it to the shoulders, which stay where the body is.
+      lay: (_x, y, section) => (section < 2 ? 1 : section === 2 ? smooth(-435, -560, y) : 0),
       // The outside of the hind leg bends from the haunch down.
       leg: (_x, y, section) => (section === 3 ? smooth(-175, -8, y) : 0),
     },
@@ -196,6 +204,8 @@ export const STROKES: readonly Stroke[] = [
       ear: none,
       beard: (x, y, section) =>
         section === 0 ? 1 - smooth(0, 125, distance(x, y, BEARD_TIP)) : 0,
+      // The chest and foreleg go down under the chin, and out of sight.
+      lay: () => 1,
       leg: (_x, y, section) => (section === 1 ? smooth(-175, -8, y) : 0),
     },
     false,
@@ -206,6 +216,7 @@ export const STROKES: readonly Stroke[] = [
       head: none,
       ear: none,
       beard: none,
+      lay: none,
       // The belly stays at its height; only what hangs below it lifts.
       leg: (_x, y) => smooth(BELLY + 6, -6, y),
       // Each inner leg travels with its rounded corner as one piece, and the

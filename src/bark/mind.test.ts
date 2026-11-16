@@ -199,3 +199,212 @@ test('his props are drawn only when out, and the score is never mirrored', () =>
   assert.equal(left.score.squeeze, 1, 'the numerals keep their own way round');
   assert.equal(left.score.tilt, -right.score.tilt);
 });
+
+/* ---------- Bedtime ---------- */
+
+/**
+ * Runs Bark while the visitor does nothing: `from` seconds idle already, and
+ * a frame's worth more with every frame.
+ */
+function idle(mind: Mind, seconds: number, from: number, night = false): Frame[] {
+  const frames: Frame[] = [];
+  for (let i = 0; i < Math.round(seconds * 60); i++) {
+    mind.rest(from + i / 60, night);
+    frames.push(mind.step(1 / 60, ground));
+  }
+  return frames;
+}
+
+/** Bark standing at 400, left alone until he is sound asleep. */
+function asleep(): Mind {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  run(mind, 0.5);
+  idle(mind, 12, 58);
+  return mind;
+}
+
+const snoring = (frame: Frame): number => frame.snores.length;
+
+test('left alone for a minute he yawns, turns about, lies down and sleeps', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  run(mind, 0.5);
+
+  // For most of a minute he is the mark, standing.
+  for (const f of idle(mind, 59.5, 0)) {
+    assert.ok(Math.abs(f.lift) < 0.01 && Math.abs(f.pitch) < 0.001, 'standing');
+    assert.equal(f.asleep, false);
+    assert.equal(snoring(f), 0);
+    assert.ok(Math.abs(f.pose.beard) < 0.05, 'mouth shut');
+  }
+
+  // Then he goes to bed.
+  const bedtime = idle(mind, 6, 59.5);
+  const lay = bedtime.findIndex((f) => f.lift < -0.02 * ground.size);
+  assert.ok(lay > 0, 'he lies down');
+  const before = bedtime.slice(0, lay);
+  assert.ok(before.some((f) => f.pose.beard > 0.35 && f.pose.head < -0.1), 'a yawn first: jaw down, head back');
+  const about = before.findIndex((f) => f.facing === -1);
+  assert.ok(about > 0, 'then a turn about');
+  assert.ok(before.slice(about).some((f) => f.facing === 1), 'and back, before he lies down');
+
+  const down = last(bedtime);
+  assert.equal(down.asleep, true);
+  assert.ok(down.pitch > 0.2 && down.pitch < 0.3, `onto his chest: ${down.pitch}`);
+  assert.ok(down.lift < -0.2 * ground.size, 'and down');
+  assert.ok(Math.abs(down.x - 400) < 1, 'where he stood');
+  assert.equal(down.facing, 1, 'facing as he was');
+});
+
+test('lying down, the mark goes down whole: only where his head rests changes', () => {
+  const mind = asleep();
+  const f = last(idle(mind, 1, 70));
+  // His legs are as they are in the mark, out of sight under him; his head
+  // is the mark's head, set down a little and barely turned.
+  assert.ok(Math.abs(f.pose.hindReach) < 1 && Math.abs(f.pose.foreReach) < 1);
+  assert.ok(f.pose.hindLift < 1 && f.pose.foreLift < 1);
+  assert.ok(Math.abs(f.pose.head) < 0.1, `head turned ${f.pose.head}`);
+  assert.ok(f.pose.headDown > 0 && f.pose.headDown < 40);
+  assert.ok(Math.abs(f.pose.beard) < 0.1, 'mouth shut');
+  // His ear lies back a little; it twitches now and then as he dreams.
+  assert.ok(f.pose.ear < 0.05 && f.pose.ear > -0.5, `ear at ${f.pose.ear}`);
+  assert.equal(f.props.card, 0);
+});
+
+test('asleep he breathes slowly and snores a string of Zs that grow as they rise', () => {
+  const mind = asleep();
+  const frames = idle(mind, 9, 70);
+  const swell = frames.map((f) => f.squash);
+  assert.ok(Math.min(...swell) > 0.94 && Math.max(...swell) < 1.06, 'gently');
+  assert.ok(Math.max(...swell) - Math.min(...swell) > 0.03, 'but visibly');
+  assert.ok(frames.every((f) => f.asleep));
+  assert.ok(frames.some((f) => snoring(f) >= 2), 'more than one in the air at once');
+  assert.ok(frames.every((f) => snoring(f) <= 3));
+  for (const f of frames) {
+    for (const s of f.snores) {
+      // Above his head, and with all of the letter within his own standing height.
+      assert.ok(s.y > 0.55 * ground.size && s.y + s.size * 0.4 < ground.size, `at ${s.y}, ${s.size} tall`);
+      assert.ok(s.x > 400, 'ahead of him');
+      assert.ok(s.size >= 0 && s.size < 0.3 * ground.size);
+    }
+    // Of two in the air, the higher is the bigger, until it shrinks away at the very top.
+    for (const low of f.snores) {
+      for (const high of f.snores) {
+        if (high.y - low.y > 0.1 * ground.size && high.y < 0.895 * ground.size) {
+          assert.ok(high.size > low.size, 'growing as they rise');
+        }
+      }
+    }
+  }
+  // They rise: from one frame to the next, the lowest one in the air is
+  // never lower, except when a new one has just left him.
+  let lowest = Infinity;
+  let count = 0;
+  for (const f of frames) {
+    const now = Math.min(Infinity, ...f.snores.map((s) => s.y));
+    if (f.snores.length <= count && now !== Infinity) assert.ok(now >= lowest - 1e-6, 'rising');
+    lowest = now;
+    count = f.snores.length;
+  }
+});
+
+test('anything the visitor does wakes him with a start', () => {
+  const mind = asleep();
+  const sleeping = last(idle(mind, 3, 70));
+  assert.ok(snoring(sleeping) > 0);
+
+  mind.watch({ x: 800, y: 0 });
+  const waking = idle(mind, 1.2, 0);
+  assert.equal(waking[0]!.asleep, false, 'awake at once');
+  assert.ok(waking.slice(15).every((f) => snoring(f) === 0), 'his snores burst');
+  assert.ok(waking[2]!.snores.every((s) => s.size < 0.1 * ground.size), 'shrinking away at once');
+  const hop = Math.max(...waking.map((f) => f.lift));
+  assert.ok(hop > 0.1 * ground.size && hop < 0.4 * ground.size, `a hop to his feet: ${hop}`);
+  assert.ok(waking.slice(0, 6).every((f) => Math.abs(f.x - 400) < 1), 'he is up before he sets off');
+
+  // Then he is himself: after the pointer, and standing as the mark.
+  const end = last(idle(mind, 4, 1.2));
+  assert.ok(Math.abs(end.x - 800) < ground.size * 0.2);
+  assert.ok(Math.abs(end.lift) < 0.5 && Math.abs(end.pitch) < 0.005);
+  assert.ok(Math.abs(end.pose.headDown) < 0.01 && Math.abs(end.pose.headOut) < 0.01);
+  assert.ok(Math.abs(end.pose.head) < 0.06, 'his head as the mark has it');
+  assert.equal(end.asleep, false);
+});
+
+test('a press wakes him rather than making him jump', () => {
+  const mind = asleep();
+  mind.jump();
+  const waking = idle(mind, 1.5, 0);
+  assert.equal(waking[0]!.asleep, false);
+  const peak = Math.max(...waking.map((f) => f.lift));
+  assert.ok(peak < 0.5 * ground.size, `a start, not a full jump: ${peak}`);
+  assert.ok(Math.abs(last(waking).lift) < 0.5);
+});
+
+test('in the small hours he goes to bed after a quarter of a minute', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  run(mind, 0.5);
+  assert.ok(idle(mind, 14.5, 0, true).every((f) => !f.asleep && Math.abs(f.lift) < 0.01));
+  assert.equal(last(idle(mind, 6, 14.5, true)).asleep, true);
+
+  // By day the same wait leaves him standing.
+  const day = new Mind(400);
+  day.watch({ x: 400, y: 0 });
+  run(day, 0.5);
+  assert.ok(idle(day, 21, 0).every((f) => !f.asleep && Math.abs(f.lift) < 0.01));
+});
+
+test('a visitor long gone comes back to find him already asleep', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  run(mind, 0.5);
+  // The page was hidden for ten minutes; this is the first frame back.
+  const back = idle(mind, 2, 600);
+  assert.equal(back[0]!.asleep, true, 'no yawning and turning for nobody to see');
+  assert.ok(back.every((f) => Math.abs(f.pose.beard) < 0.1 && f.facing === 1));
+  assert.ok(back.some((f) => snoring(f) > 0), 'and he is snoring');
+  assert.equal(mind.calm, true);
+  assert.equal(mind.resting, false);
+});
+
+test('stirring while he yawns or turns about just leaves him up', () => {
+  for (const until of [60.6, 61.6]) {
+    const mind = new Mind(400);
+    mind.watch({ x: 400, y: 0 });
+    run(mind, 0.5);
+    idle(mind, until - 59, 59);
+    const after = idle(mind, 2, 0);
+    assert.ok(after.every((f) => f.lift > -0.01 * ground.size && !f.asleep), 'he never lies down');
+    const end = last(after);
+    assert.equal(end.facing, 1, 'facing as he was');
+    assert.ok(Math.abs(end.pose.beard) < 0.05 && Math.abs(end.pose.head) < 0.05, 'as the mark');
+  }
+});
+
+test('dressed for a part, he puts it away to sleep and takes it up again on waking', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  mind.dress('judge');
+  run(mind, 1.5);
+  const down = last(idle(mind, 8, 58));
+  assert.equal(down.asleep, true);
+  assert.equal(down.props.card, 0);
+  const up = last(idle(mind, 2.5, 0));
+  assert.ok(up.props.card > 0.95, 'the card is up again');
+});
+
+test('asleep or going to bed he never strays far from the mark', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  run(mind, 0.5);
+  const frames = [...idle(mind, 20, 55), ...idle(mind, 3, 0)];
+  for (const f of frames) {
+    assert.ok(f.squash >= 0.7 && f.squash <= 1.2);
+    assert.ok(f.pitch > -0.2 && f.pitch < 0.3, `pitch ${f.pitch}`);
+    assert.ok(Math.abs(f.pose.head) < 0.35 && Math.abs(f.pose.ear) < 0.9);
+    assert.ok(f.pose.beard < 0.7);
+    assert.ok(f.lift > -0.35 * ground.size, `lift ${f.lift}`);
+  }
+});

@@ -1,4 +1,5 @@
-import { Mind, type Frame, type Ground, type Role } from './mind.ts';
+import { smallHours } from './hours.ts';
+import { LEAN_ABOUT, Mind, type Frame, type Ground, type Role } from './mind.ts';
 import { draw, REST } from './pose.ts';
 import { drawProps } from './props.ts';
 import { HEIGHT, LEFT, MITER_LIMIT, RIGHT, STROKE } from './shape.ts';
@@ -21,6 +22,13 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Far enough to cover the drawing in every pose, and the page at any size. */
 const FAR = 4000;
 
+/** What his button says he is for: awake, and asleep. */
+const AWAKE = 'Bark, the ScottyLabs dog. Press to make him jump.';
+const ASLEEP = 'Bark, the ScottyLabs dog, asleep. Press to wake him.';
+
+/** How often the time where he lives is looked up, in milliseconds. */
+const CLOCK_EVERY_MS = 60_000;
+
 function svg<K extends keyof SVGElementTagNameMap>(
   name: K,
   attributes: Record<string, string> = {},
@@ -32,9 +40,10 @@ function svg<K extends keyof SVGElementTagNameMap>(
 
 /**
  * Bark on the page: he walks along the top edge of the ground element after
- * the pointer, and jumps when pressed. The drawing is rebuilt from his pose
- * every frame. Squashing and turning move its points; the only transform on
- * it is a uniform one, so his line keeps its weight however he moves.
+ * the pointer, jumps when pressed, and goes to sleep when the visitor has done
+ * nothing for a while. The drawing is rebuilt from his pose every frame.
+ * Squashing and turning move its points; the only transform on it is a
+ * uniform one, so his line keeps its weight however he moves.
  */
 export class Bark {
   private readonly stage: HTMLElement;
@@ -51,6 +60,7 @@ export class Bark {
   private readonly plate: SVGPathElement;
   private readonly score: SVGTextElement;
   private readonly laptop: SVGPathElement;
+  private readonly snores: SVGTextElement[];
   private readonly button: HTMLButtonElement;
 
   private readonly parts: readonly { element: HTMLElement; role: Role }[];
@@ -65,6 +75,14 @@ export class Bark {
   private readonly home = 0.14;
 
   private lastStep = 0;
+
+  /** When the visitor last did anything, and where the pointer was then. */
+  private stirred = performance.now();
+  private readonly last = { x: NaN, y: NaN };
+  /** Whether it is night where he lives, and when that was last looked up. */
+  private night = false;
+  private clockRead = -Infinity;
+  private asleep = false;
 
   constructor(options: BarkOptions) {
     this.stage = options.stage;
@@ -115,13 +133,19 @@ export class Bark {
     this.score.textContent = '10';
 
     this.body.append(clipped, this.laptop, this.stick, this.plate, this.score);
-    grounded.append(this.body);
+    // His snores are set on the stage, not on him: they drift off as he lies still.
+    this.snores = [0, 1, 2].map(() => {
+      const snore = svg('text', { class: 'bark__snore', visibility: 'hidden' });
+      snore.textContent = 'Z';
+      return snore;
+    });
+    grounded.append(this.body, ...this.snores);
     art.append(defs, grounded);
 
     this.button = document.createElement('button');
     this.button.type = 'button';
     this.button.className = 'bark__button';
-    this.button.setAttribute('aria-label', 'Bark, the ScottyLabs dog. Press to make him jump.');
+    this.button.setAttribute('aria-label', AWAKE);
 
     this.root.append(art, this.button);
     this.stage.append(this.root);
@@ -140,6 +164,8 @@ export class Bark {
           pitch: 0,
           pose: REST,
           props: { card: 0, laptop: 0 },
+          asleep: false,
+          snores: [],
         },
         ground,
       );
@@ -174,6 +200,27 @@ export class Bark {
 
     // A click covers mouse, touch and keyboard alike.
     this.button.addEventListener('click', () => this.mind?.jump());
+
+    // Anything the visitor does keeps him up, or wakes him. The browser can
+    // report a pointer movement when it is the page that moved under a still
+    // pointer, as it does when he lies down beneath it: only a pointer that
+    // has changed place counts.
+    const stir = (): void => {
+      this.stirred = performance.now();
+    };
+    window.addEventListener(
+      'pointermove',
+      (event) => {
+        if (event.clientX === this.last.x && event.clientY === this.last.y) return;
+        this.last.x = event.clientX;
+        this.last.y = event.clientY;
+        stir();
+      },
+      { passive: true },
+    );
+    for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'] as const) {
+      window.addEventListener(type, stir, { passive: true });
+    }
 
     // He dresses for a part while the pointer is over its element. A finger
     // does not hover, so touch is left out. Keyboard focus counts too, and
@@ -218,10 +265,16 @@ export class Bark {
     const mind = this.mind;
     if (!mind) return;
 
-    // Breathing alone does not need every frame.
+    // Breathing alone does not need every frame, awake or asleep.
     const elapsed = now - this.lastStep;
-    if (mind.resting && elapsed < 45) return;
+    if (mind.calm && elapsed < 45) return;
     this.lastStep = now;
+
+    if (now - this.clockRead > CLOCK_EVERY_MS) {
+      this.clockRead = now;
+      this.night = smallHours(new Date());
+    }
+    mind.rest(Math.max(0, now - this.stirred) / 1000, this.night);
 
     const ground = this.measure();
     mind.dress(this.hovered ?? this.focused?.role ?? null);
@@ -283,9 +336,31 @@ export class Bark {
     this.body.setAttribute(
       'transform',
       `translate(${frame.x.toFixed(2)} ${top.toFixed(2)}) ` +
-        `rotate(${lean.toFixed(2)} 0 ${(-0.35 * ground.size).toFixed(1)}) ` +
+        `rotate(${lean.toFixed(2)} 0 ${(-LEAN_ABOUT * ground.size).toFixed(1)}) ` +
         `scale(${scale.toFixed(5)})`,
     );
+
+    // His snores: the letter Z in the wordmark's type, each set upright where it has drifted to.
+    frame.snores.forEach((snore, i) => {
+      const letter = this.snores[i];
+      if (!letter) return;
+      letter.setAttribute('visibility', 'visible');
+      letter.setAttribute('font-size', snore.size.toFixed(1));
+      letter.setAttribute(
+        'transform',
+        `translate(${snore.x.toFixed(1)} ${(ground.y - snore.y).toFixed(1)}) ` +
+          `rotate(${snore.tilt.toFixed(1)}) translate(0 ${(snore.size * 0.36).toFixed(1)})`,
+      );
+    });
+    for (let i = frame.snores.length; i < this.snores.length; i++) {
+      this.snores[i]?.setAttribute('visibility', 'hidden');
+    }
+
+    // What his button offers changes when he is asleep.
+    if (frame.asleep !== this.asleep) {
+      this.asleep = frame.asleep;
+      this.button.setAttribute('aria-label', frame.asleep ? ASLEEP : AWAKE);
+    }
 
     // The button follows him: it is what is pressed, and what takes focus.
     const width = ((RIGHT - LEFT) / HEIGHT) * ground.size;

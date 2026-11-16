@@ -60,6 +60,16 @@
   text-anchor: middle;
 }
 
+/* His snores, in the wordmark's own type. Ink only: they come and go by
+   growing and shrinking, never by fading. */
+.bark__snore {
+  fill: var(--ink);
+  font-family: var(--font-wide);
+  font-weight: 900;
+  font-stretch: 125%;
+  text-anchor: middle;
+}
+
 /* Follows him around: the thing that is pressed, and that takes focus. */
 .bark__button {
   position: absolute;

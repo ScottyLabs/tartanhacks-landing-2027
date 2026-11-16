@@ -17,6 +17,9 @@ export interface Pose {
   head: number;
   ear: number;
   beard: number;
+  /** The head laid down to sleep: how far it is lowered, and how far pushed out ahead. */
+  headDown: number;
+  headOut: number;
 }
 
 /**
@@ -40,6 +43,8 @@ export const REST: Readonly<Pose> = {
   head: 0,
   ear: 0,
   beard: 0,
+  headDown: 0,
+  headOut: 0,
 };
 
 /** How far a stroke runs on past a foot, so the foot can be cut flat. */
@@ -74,6 +79,9 @@ function place(stroke: Stroke, pose: Pose, build: Build): number {
     turn(i, EAR_BASE, pose.ear * stroke.ear[p]!);
     turn(i, BEARD_CORNER, pose.beard * stroke.beard[p]!);
     turn(i, NECK, pose.head * stroke.head[p]!);
+    // Laying his head down moves it whole, after it has turned.
+    scratch[i] = scratch[i]! + pose.headOut * stroke.lay[p]!;
+    scratch[i + 1] = scratch[i + 1]! + pose.headDown * stroke.lay[p]!;
     scratch[i] = (scratch[i]! - MIDDLE) * build.wide;
     scratch[i + 1] = scratch[i + 1]! * build.tall;
   }
@@ -140,8 +148,8 @@ function mouthIn(pose: Pose, build: Build): { x: number; y: number } {
   const cos = Math.cos(pose.head);
   const sin = Math.sin(pose.head);
   return {
-    x: (NECK.x + dx * cos - dy * sin - MIDDLE) * build.wide,
-    y: (NECK.y + dx * sin + dy * cos) * build.tall,
+    x: (NECK.x + dx * cos - dy * sin + pose.headOut - MIDDLE) * build.wide,
+    y: (NECK.y + dx * sin + dy * cos + pose.headDown) * build.tall,
   };
 }
 
