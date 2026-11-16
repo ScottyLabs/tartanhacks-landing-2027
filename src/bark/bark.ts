@@ -362,10 +362,15 @@ export class Bark {
       this.button.setAttribute('aria-label', frame.asleep ? ASLEEP : AWAKE);
     }
 
-    // The button follows him: it is what is pressed, and what takes focus.
+    // The button follows him: it is what is pressed, and what takes focus. It
+    // goes up with him when he jumps, but never down past the ground when he
+    // lies down: under the ground are the sign-up links.
     const width = ((RIGHT - LEFT) / HEIGHT) * ground.size;
+    const raised = Math.max(0, frame.lift);
     this.button.style.width = `${width.toFixed(1)}px`;
     this.button.style.height = `${ground.size.toFixed(1)}px`;
-    this.button.style.translate = `${(frame.x - width / 2).toFixed(1)}px ${(top - ground.size).toFixed(1)}px`;
+    this.button.style.translate =
+      `${(frame.x - width / 2).toFixed(1)}px ` +
+      `${(ground.y - raised - ground.size).toFixed(1)}px`;
   }
 }
