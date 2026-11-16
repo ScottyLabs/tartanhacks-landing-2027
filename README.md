@@ -103,7 +103,7 @@ The page works at every level of support:
 
 The repo ships a `Dockerfile` that builds the site and serves it with nginx, with a strict Content-Security-Policy. nginx listens on `$PORT`, or on 80 when that is not set, and answers health checks at `/health` and `/healthz`.
 
-The page sets no inline styles or scripts in its markup, so it runs under `style-src 'self'; script-src 'self'`. Keep it that way when editing, or nginx's policy will block the change.
+The page sets no inline styles or scripts in its markup, so it runs under `style-src 'self'; script-src 'self'`. Keep it that way when editing, or nginx's policy will block the change. The one outside script allowed is Cloudflare Web Analytics, which Cloudflare adds to the page on `tartanhacks.com`.
 
 ### Search engines
 
@@ -111,7 +111,7 @@ Only `tartanhacks.com` is meant to be indexed. The page names it as its canonica
 
 ### Railway
 
-The site runs as the `2027` service of the `TartanHacks-History` project, next to the earlier years. `railway.json` tells Railway to build the Dockerfile and to check `/health`; Railway provides `PORT`. The service deploys from this repo's `main` branch.
+The site runs as the `2027` service of the `TartanHacks-History` project, next to the earlier years, and serves `tartanhacks.com`. It is connected to this repo: a push to `main` deploys. `railway.json` tells Railway to build the Dockerfile and to check `/health`; Railway provides `PORT`.
 
 ### Sheltie
 
