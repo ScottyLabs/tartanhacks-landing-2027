@@ -54,14 +54,14 @@ test('pads to two digits and keeps longer day counts whole', () => {
 test('describes the wait in words, with correct singulars', () => {
   assert.equal(
     describe({ days: 1, hours: 1, minutes: 0, seconds: 0, done: false }),
-    '1 day and 1 hour until the theme and registration drop.',
+    '1 day and 1 hour until registration opens.',
   );
   assert.equal(
     describe({ days: 17, hours: 4, minutes: 0, seconds: 0, done: false }),
-    '17 days and 4 hours until the theme and registration drop.',
+    '17 days and 4 hours until registration opens.',
   );
   assert.equal(
     describe({ days: 0, hours: 0, minutes: 0, seconds: 0, done: true }),
-    'The theme and registration have dropped.',
+    'Registration is open.',
   );
 });

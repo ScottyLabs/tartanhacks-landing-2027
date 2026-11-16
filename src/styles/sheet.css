@@ -253,6 +253,11 @@
   letter-spacing: -0.008em;
 }
 
+/* The lead's two sentences break between them, never inside one. */
+.drop__part {
+  display: inline-block;
+}
+
 /* The theme's name, struck out with the heaviest line the text can carry. */
 .redacted {
   display: inline-block;
@@ -393,10 +398,15 @@
   }
 }
 
-/* The narrowest phones: the countdown gives up some of its side padding. */
+/* The narrowest phones: the countdown gives up some of its side padding,
+   and the lead is set small enough to keep each sentence on one line. */
 @media (max-width: 340px) {
   .countdown__unit {
     padding-inline: calc(var(--pitch) * 1.1);
+  }
+
+  .plate--lead {
+    font-size: 15px;
   }
 }
 

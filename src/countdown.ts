@@ -33,10 +33,10 @@ export function pad(value: number): string {
 
 /** A sentence for assistive technology, which should not hear a ticking clock. */
 export function describe(r: Remaining): string {
-  if (r.done) return 'The theme and registration have dropped.';
+  if (r.done) return 'Registration is open.';
   const days = `${r.days} ${r.days === 1 ? 'day' : 'days'}`;
   const hours = `${r.hours} ${r.hours === 1 ? 'hour' : 'hours'}`;
-  return `${days} and ${hours} until the theme and registration drop.`;
+  return `${days} and ${hours} until registration opens.`;
 }
 
 const UNITS = ['days', 'hours', 'minutes', 'seconds'] as const;

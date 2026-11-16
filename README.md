@@ -2,15 +2,15 @@
 
 The teaser site for TartanHacks 2027: February 5–6 at Carnegie Mellon University, Pittsburgh, hosted by [ScottyLabs](https://scottylabs.org).
 
-It does three jobs until the theme and registration drop on December 1:
+It does three jobs until registration opens on December 1, with the theme announced after that:
 
 - says when and where,
-- counts down to the drop,
+- counts down to registration opening,
 - sends students to the pre-registration form and judges to the judge interest form.
 
 Bark, the ScottyLabs dog, lives on it too: he walks along the top of the sign-up band after your pointer, and jumps when you press him.
 
-On December 1 this site is replaced by the full event site.
+Later it is replaced by the full event site, made by the ScottyLabs design committee.
 
 ## Run it
 
@@ -38,7 +38,7 @@ Everything a visitor reads is in `index.html`.
 |---|---|
 | Dates, place, copy | `index.html` |
 | Form links | the two `<a class="band__half">` links in `index.html` |
-| The drop moment | the `datetime` on `<time id="drop-time">` in `index.html` (midnight Eastern, December 1, 2026) |
+| When registration opens | the `datetime` on `<time id="drop-time">` in `index.html` (midnight Eastern, December 1, 2026) |
 | The site's public address | `VITE_SITE_URL` in `.env`, used for the share image |
 | Share image | `public/og.png` (1200 × 630) |
 | Search listing | the `<title>`, the description and the event data (`application/ld+json`) in the head of `index.html` |
@@ -97,7 +97,7 @@ The page works at every level of support:
 |---|---|
 | Reduced motion requested | The finished sheet, drawn once, with no entrance. Bark stands still. |
 | No WebGL 2 | A solid wordmark on white, CSS rules below the band. The countdown still runs. |
-| No JavaScript | A solid wordmark on white, CSS rules below the band, and the drop date in text. |
+| No JavaScript | A solid wordmark on white, CSS rules below the band, and the registration date in text. |
 
 ## Deploy
 
