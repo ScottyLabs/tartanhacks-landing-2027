@@ -1,6 +1,7 @@
 import { Bark } from './bark/bark.ts';
 import { startCountdown } from './countdown.ts';
 import { Field } from './field/field.ts';
+import { Redaction } from './redaction/redaction.ts';
 
 const root = document.documentElement;
 
@@ -44,6 +45,19 @@ async function main(): Promise<void> {
   ].flatMap((part) => (part.element ? [{ element: part.element, role: part.role }] : []));
   const bark =
     stage && band && runway ? new Bark({ stage, ground: band, sizer: runway, parts }) : null;
+
+  // The bar over the theme can be pulled like rubber. Bark stands over it
+  // while it is, and barks when it snaps back. Not for visitors who asked
+  // for less motion: for them it stays a bar.
+  const bar = stage?.querySelector<HTMLElement>('.redacted');
+  if (stage && bar && !still) {
+    new Redaction({
+      stage,
+      bar,
+      onHold: (at) => bark?.guard(at),
+      onSnap: () => bark?.speak(2),
+    });
+  }
 
   if (!field) {
     // Bark does not need the field: he is drawn in SVG.

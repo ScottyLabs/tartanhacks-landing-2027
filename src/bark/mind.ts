@@ -56,6 +56,9 @@ export interface Frame {
   pitch: number;
   pose: Pose;
   props: Props;
+  /** A bark: 1 as it starts, falling to 0 as it dies away; and which way it goes, in radians above level. */
+  bark: number;
+  barkAim: number;
   /** True while he is lying asleep. */
   asleep: boolean;
   /** The snores now in the air: none, or a few. */
@@ -116,6 +119,14 @@ const STARTLE = 0.2;
 
 /** What a frame carries when he is not snoring: the same empty list every time. */
 const NO_SNORES: Snore[] = [];
+
+/* ---------- Keeping watch, and barking. ---------- */
+
+/** A bark lasts this long, and barks in a row come this far apart. */
+const BARK_S = 0.26;
+const BARK_EVERY_S = 0.3;
+/** The first of them comes with a start: a hop this high. */
+const START = 0.14;
 
 /* ---------- The zoomies and the backflip. Distances are in body heights. ---------- */
 
@@ -230,6 +241,13 @@ export class Mind {
   private zoomWay: 1 | -1 = 1;
   private zoomDir = 0;
   private zoomTime = 0;
+  /** Something he has been set to keep watch over, if anything: along the ground, and above it. */
+  private guarded: { x: number; y: number } | null = null;
+  /** A bark as it dies away, how many more are to come, and how long until the next. */
+  private voice = 0;
+  private barksDue = 0;
+  private barkWait = 0;
+
   /** Quick presses counted, and when the last one was. */
   private presses = 0;
   private pressedAt = -Infinity;
@@ -287,6 +305,23 @@ export class Mind {
   }
 
   /**
+   * Sets him to keep watch over something: he goes and stands by it, and
+   * keeps his eyes on it. Its place is given like the pointer's, along the
+   * ground and above it; below zero it is under his ground. Null lets him be.
+   */
+  guard(point: { x: number; y: number } | null): void {
+    if (point && !this.guarded) this.ear.velocity += 2.2;
+    this.guarded = point;
+  }
+
+  /** Makes him bark, so many times in a row. Asleep, he wakes to do it. */
+  bark(times = 1): void {
+    if (this.barksDue === 0) this.barkWait = 0;
+    this.barksDue += times;
+    this.rouse();
+  }
+
+  /**
    * Gives him the zoomies: he tears back and forth past where he stands, a
    * few times, and stops. Ignored if he has them already, is in bed, or is
    * dressed for a part.
@@ -334,7 +369,10 @@ export class Mind {
       Math.abs(this.lie.value) < 0.004 &&
       Math.abs(this.yawn.value) < 0.01 &&
       this.zoomRun < 0 &&
-      !this.flipDue
+      !this.flipDue &&
+      this.guarded === null &&
+      this.barksDue === 0 &&
+      this.voice === 0
     );
   }
 
@@ -443,6 +481,26 @@ export class Mind {
     const zooming = dash !== null;
     const free = up && !zooming;
     const part = free ? this.role : null;
+    // What he goes to and looks at: what he is guarding, or else the pointer.
+    const mark = this.guarded ?? this.pointer;
+
+    // --- Barking: each bark with a jolt, and the first with a start.
+    this.voice = Math.max(0, this.voice - dt / BARK_S);
+    if (this.barksDue > 0 && free) {
+      this.barkWait -= dt;
+      if (this.barkWait <= 0) {
+        if (this.voice === 0 && this.mode === 'grounded') {
+          this.mode = 'airborne';
+          this.rise = Math.sqrt(2 * GRAVITY * START) * size;
+        }
+        this.voice = 1;
+        this.barksDue -= 1;
+        this.barkWait = BARK_EVERY_S;
+        this.squash.velocity += 1.7;
+        this.beard.velocity += 3.2;
+        this.ear.velocity -= 2.4;
+      }
+    }
 
     // --- Chase: head for the pointer, slowing as he closes in.
     let want = 0;
@@ -450,8 +508,8 @@ export class Mind {
       // Flat out, turning at the last moment; or slowing to a stop.
       const gap = dash - this.x;
       want = Math.sign(gap) * Math.min(top * ZOOM, slowing ? Math.abs(gap) * 8 : Infinity);
-    } else if (this.pointer && this.mode !== 'crouching' && up) {
-      const goal = clamp(this.pointer.x, ground.left, ground.right);
+    } else if (mark && this.mode !== 'crouching' && up) {
+      const goal = clamp(mark.x, ground.left, ground.right);
       const gap = goal - this.x;
       // Dressed for a part he holds his ground while the pointer wanders
       // nearby, so a small move of the mouse does not make him pack up.
@@ -471,8 +529,8 @@ export class Mind {
       // Left as it is.
     } else if (pace > 0.04) {
       this.heading = this.speed > 0 ? 1 : -1;
-    } else if (free && this.pointer && Math.abs(this.pointer.x - this.x) > 0.45 * size) {
-      this.heading = this.pointer.x > this.x ? 1 : -1;
+    } else if (free && mark && Math.abs(mark.x - this.x) > 0.45 * size) {
+      this.heading = mark.x > this.x ? 1 : -1;
     }
     this.facing += (this.heading - this.facing) * toward(dt, 0.055);
     if (Math.abs(this.heading - this.facing) < 0.002) this.facing = this.heading;
@@ -593,12 +651,19 @@ export class Mind {
     }
 
     // --- Gaze: standing, he looks up at a pointer that is above and near him.
+    // What he is guarding he keeps his eyes on wherever it is, and it may be
+    // under his ground, so he looks down at it.
     let look = 0;
-    if (this.pointer && this.mode === 'grounded' && free) {
-      const ahead = Math.abs(this.pointer.x - this.x);
-      const above = this.pointer.y - 0.8 * size;
-      const near = 1 - clamp((ahead - 1.2 * size) / (2 * size), 0, 1);
-      look = clamp(Math.atan2(above, Math.max(0.5 * size, ahead)), -0.15, 0.9) * 0.2 * near * (1 - this.gait);
+    if (mark && this.mode === 'grounded' && free) {
+      const ahead = Math.abs(mark.x - this.x);
+      const above = mark.y - 0.8 * size;
+      const angle = Math.atan2(above, Math.max(0.5 * size, ahead));
+      if (this.guarded) {
+        look = clamp(angle, -0.9, 0.9) * 0.3 * (1 - this.gait);
+      } else {
+        const near = 1 - clamp((ahead - 1.2 * size) / (2 * size), 0, 1);
+        look = clamp(angle, -0.15, 0.9) * 0.2 * near * (1 - this.gait);
+      }
     }
     this.gaze.step(look, 60, 13, dt);
 
@@ -657,6 +722,9 @@ export class Mind {
     pose.ear += 0.03 * atKeys * this.keys * Math.sin(this.typing * TAU * 9.5 + 1);
     pose.beard = this.beard.value + this.gait * 0.07 * Math.sin(this.stride * 2 + 0.7);
 
+    // A bark throws his head back.
+    pose.head -= 0.11 * this.voice;
+
     // A yawn: his head goes back and his jaw drops, and his ear with it.
     pose.head -= 0.2 * yawning;
     pose.beard += 0.55 * yawning;
@@ -698,6 +766,9 @@ export class Mind {
       pitch: 0.05 * swing * this.gait - 0.09 * flight + tilt + over,
       pose,
       props: { card: clamp(this.card.value, 0, 1.15), laptop: this.laptop },
+      bark: this.voice,
+      // He barks at what he is guarding: down at it, if it is under his ground.
+      barkAim: this.guarded && this.guarded.y < 0 ? -0.3 : 0.5,
       asleep: down && lying > 0.9,
       snores,
     };

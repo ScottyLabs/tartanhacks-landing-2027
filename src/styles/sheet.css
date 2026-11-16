@@ -267,6 +267,72 @@
   background: var(--ink);
 }
 
+/* The bar can be taken hold of and pulled, like rubber. A little room round
+   it, where a press still counts, makes it easier to take hold of. */
+.redacted--rubber {
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.redacted--rubber::before {
+  content: '';
+  position: absolute;
+  inset: -0.35em -0.2em;
+}
+
+.redacted--held {
+  cursor: grabbing;
+}
+
+/* What is written under it: ink on ink until the bar is pulled away. */
+.redacted__under {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.52em;
+  font-weight: 700;
+  font-stretch: 100%;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Out of shape, the bar is drawn on a layer over the stage instead, where it
+   can stretch past the line it sits in. */
+.redacted--out {
+  background: none;
+}
+
+.rubber {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rubber[hidden] {
+  display: none;
+}
+
+/* A rim of paper keeps it readable where it is pulled across other ink:
+   the countdown's numerals, the rules. On the plate the rim does not show. */
+.rubber__band {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 3px;
+  stroke-linejoin: miter;
+  paint-order: stroke;
+}
+
 .countdown {
   display: inline-grid;
   grid-auto-flow: column;

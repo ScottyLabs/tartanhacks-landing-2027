@@ -558,3 +558,56 @@ test('pressed five times as he sleeps, he wakes and then flips', () => {
   const end = last(frames);
   assert.ok(Math.abs(end.lift) < 0.5 && Math.abs(end.pitch) < 0.005);
 });
+
+/* ---------- Keeping watch, and barking ---------- */
+
+test('set to guard something under his ground, he stands over it and looks down at it', () => {
+  const mind = new Mind(200);
+  mind.watch({ x: 200, y: 0 });
+  run(mind, 0.5);
+  // Something well below the ground, off to his right. The pointer is there too, lower still.
+  mind.watch({ x: 620, y: -200 });
+  mind.guard({ x: 600, y: -210 });
+  const watching = last(run(mind, 3));
+  assert.ok(Math.abs(watching.x - 600) < ground.size * 0.2, `over it, at ${watching.x}`);
+  assert.ok(watching.pose.head > 0.15 && watching.pose.head < 0.35, `looking down: ${watching.pose.head}`);
+  assert.ok(watching.barkAim < 0, 'and that is where a bark would go');
+  assert.equal(mind.resting, false);
+
+  // Let be, he looks up again and is the mark.
+  mind.guard(null);
+  mind.watch({ x: 600, y: 0 });
+  const after = last(run(mind, 2));
+  assert.ok(Math.abs(after.pose.head) < 0.06);
+  assert.ok(after.barkAim > 0);
+});
+
+test('he barks as many times as he is asked, the first with a start', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  run(mind, 0.5);
+  mind.bark(2);
+  const frames = run(mind, 2);
+  // Each bark begins at full voice and dies away.
+  let barks = 0;
+  for (let i = 1; i < frames.length; i++) {
+    if (frames[i]!.bark > frames[i - 1]!.bark) barks += 1;
+  }
+  assert.equal(barks + (frames[0]!.bark === 1 ? 1 : 0), 2);
+  assert.equal(frames[0]!.bark, 1, 'at once');
+  assert.ok(frames.every((f) => f.bark >= 0 && f.bark <= 1));
+  const hop = Math.max(...frames.map((f) => f.lift));
+  assert.ok(hop > 0.08 * ground.size && hop < 0.3 * ground.size, `a start: ${hop}`);
+  assert.ok(frames.some((f) => f.pose.head < -0.05), 'his head goes back with it');
+  const end = last(frames);
+  assert.equal(end.bark, 0);
+  assert.ok(Math.abs(end.lift) < 0.5 && Math.abs(end.x - 400) < 2);
+});
+
+test('asleep, he wakes to bark', () => {
+  const mind = asleep();
+  mind.bark(1);
+  const frames = idle(mind, 1.5, 0);
+  assert.equal(frames[0]!.asleep, false);
+  assert.ok(frames.some((f) => f.bark === 1));
+});

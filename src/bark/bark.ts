@@ -23,6 +23,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Far enough to cover the drawing in every pose, and the page at any size. */
 const FAR = 4000;
 
+/** A bark is drawn as three short strokes thrown out from his mouth, this far apart, in radians. */
+const BARK_SPREAD = 0.44;
+
 /** What his button says he is for: awake, and asleep. */
 const AWAKE = 'Bark, the ScottyLabs dog. Press to make him jump.';
 const ASLEEP = 'Bark, the ScottyLabs dog, asleep. Press to wake him.';
@@ -63,6 +66,7 @@ export class Bark {
   private readonly score: SVGTextElement;
   private readonly laptop: SVGPathElement;
   private readonly snores: SVGTextElement[];
+  private readonly woof: SVGPathElement;
   private readonly button: HTMLButtonElement;
 
   private readonly parts: readonly { element: HTMLElement; role: Role }[];
@@ -87,6 +91,8 @@ export class Bark {
   private asleep = false;
   /** Watches for the pointer being whirled round, which gives him the zoomies. */
   private readonly whirl = new Whirl();
+  /** Something on the page he has been set to keep watch over, in the window's coordinates. */
+  private guarding: { x: number; y: number } | null = null;
 
   constructor(options: BarkOptions) {
     this.stage = options.stage;
@@ -143,7 +149,9 @@ export class Bark {
       snore.textContent = 'Z';
       return snore;
     });
-    grounded.append(this.body, ...this.snores);
+    // A bark is set on the stage too, so that it does not lean as he does.
+    this.woof = svg('path', { class: 'bark__line' });
+    grounded.append(this.body, ...this.snores, this.woof);
     art.append(defs, grounded);
 
     this.button = document.createElement('button');
@@ -153,6 +161,20 @@ export class Bark {
 
     this.root.append(art, this.button);
     this.stage.append(this.root);
+  }
+
+  /**
+   * Sets him to keep watch over a point on the page, given in the window's
+   * coordinates: he goes and stands as near it as his ground lets him, and
+   * looks at it. Null lets him be.
+   */
+  guard(point: { x: number; y: number } | null): void {
+    this.guarding = point;
+  }
+
+  /** Makes him bark, so many times in a row. */
+  speak(times = 1): void {
+    this.mind?.bark(times);
   }
 
   /** Shows Bark standing still, for visitors who asked for less motion. */
@@ -168,6 +190,8 @@ export class Bark {
           pitch: 0,
           pose: REST,
           props: { card: 0, laptop: 0 },
+          bark: 0,
+          barkAim: 0,
           asleep: false,
           snores: [],
         },
@@ -290,6 +314,12 @@ export class Bark {
 
     const ground = this.measure();
     mind.dress(this.hovered ?? this.focused?.role ?? null);
+    const guarding = this.guarding;
+    mind.guard(
+      guarding
+        ? { x: guarding.x - ground.originX, y: ground.y - (guarding.y - ground.originY) }
+        : null,
+    );
     if (this.focused && !this.hovered) {
       // With the keyboard there is no pointer to follow: go to the element.
       const box = this.focused.element.getBoundingClientRect();
@@ -351,6 +381,30 @@ export class Bark {
         `rotate(${lean.toFixed(2)} 0 ${(-LEAN_ABOUT * ground.size).toFixed(1)}) ` +
         `scale(${scale.toFixed(5)})`,
     );
+
+    // A bark: three short strokes of his own line, thrown out from his mouth.
+    let woof = '';
+    if (frame.bark > 0) {
+      // His mouth, placed as the drawing is: scaled, leant, and set on the ground.
+      const turn = (lean * Math.PI) / 180;
+      const px = drawing.mouth.x * scale;
+      const py = drawing.mouth.y * scale + LEAN_ABOUT * ground.size;
+      const mx = frame.x + px * Math.cos(turn) - py * Math.sin(turn);
+      const my = top - LEAN_ABOUT * ground.size + px * Math.sin(turn) + py * Math.cos(turn);
+      const side = frame.facing >= 0 ? 1 : -1;
+      const gone = 1 - frame.bark;
+      const from = (0.2 + 0.26 * gone) * ground.size;
+      const to = from + (0.03 + 0.2 * frame.bark) * ground.size;
+      for (const spread of [-BARK_SPREAD, 0, BARK_SPREAD]) {
+        const dx = side * Math.cos(frame.barkAim + spread);
+        const dy = -Math.sin(frame.barkAim + spread);
+        woof +=
+          `M${(mx + dx * from).toFixed(1)},${(my + dy * from).toFixed(1)}` +
+          `L${(mx + dx * to).toFixed(1)},${(my + dy * to).toFixed(1)}`;
+      }
+      this.woof.setAttribute('stroke-width', (STROKE * scale).toFixed(2));
+    }
+    this.woof.setAttribute('d', woof);
 
     // His snores: the letter Z in the wordmark's type, each set upright where it has drifted to.
     frame.snores.forEach((snore, i) => {
