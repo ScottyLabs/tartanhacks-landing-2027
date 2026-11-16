@@ -2,6 +2,7 @@ import { smallHours } from './hours.ts';
 import { LEAN_ABOUT, Mind, type Frame, type Ground, type Role } from './mind.ts';
 import { draw, REST } from './pose.ts';
 import { drawProps } from './props.ts';
+import { Whirl } from './whirl.ts';
 import { HEIGHT, LEFT, MITER_LIMIT, RIGHT, STROKE } from './shape.ts';
 
 export interface BarkOptions {
@@ -40,8 +41,9 @@ function svg<K extends keyof SVGElementTagNameMap>(
 
 /**
  * Bark on the page: he walks along the top edge of the ground element after
- * the pointer, jumps when pressed, and goes to sleep when the visitor has done
- * nothing for a while. The drawing is rebuilt from his pose every frame.
+ * the pointer, jumps when pressed, gets the zoomies when the pointer is
+ * whirled about, and goes to sleep when the visitor has done nothing for a
+ * while. The drawing is rebuilt from his pose every frame.
  * Squashing and turning move its points; the only transform on it is a
  * uniform one, so his line keeps its weight however he moves.
  */
@@ -83,6 +85,8 @@ export class Bark {
   private night = false;
   private clockRead = -Infinity;
   private asleep = false;
+  /** Watches for the pointer being whirled round, which gives him the zoomies. */
+  private readonly whirl = new Whirl();
 
   constructor(options: BarkOptions) {
     this.stage = options.stage;
@@ -183,17 +187,25 @@ export class Bark {
     this.mind = new Mind(-ground.size);
     this.root.hidden = false;
 
+    // Wherever the pointer goes he follows; whirled round and round, fast,
+    // it gives him the zoomies.
+    const whirled = (x: number, y: number, time: number): void => {
+      if (this.whirl.move(x, y, time)) this.mind?.zoom();
+    };
     window.addEventListener(
       'pointermove',
       (event) => {
         if (event.pointerType === 'touch') return;
         this.pointer = { x: event.clientX, y: event.clientY };
+        whirled(event.clientX, event.clientY, event.timeStamp);
       },
       { passive: true },
     );
     const touched = (event: TouchEvent): void => {
       const touch = event.touches[0];
-      if (touch) this.pointer = { x: touch.clientX, y: touch.clientY };
+      if (!touch) return;
+      this.pointer = { x: touch.clientX, y: touch.clientY };
+      whirled(touch.clientX, touch.clientY, event.timeStamp);
     };
     window.addEventListener('touchstart', touched, { passive: true });
     window.addEventListener('touchmove', touched, { passive: true });
@@ -362,13 +374,15 @@ export class Bark {
       this.button.setAttribute('aria-label', frame.asleep ? ASLEEP : AWAKE);
     }
 
-    // The button follows him: it is what is pressed, and what takes focus. It
-    // goes up with him when he jumps, but never down past the ground when he
-    // lies down: under the ground are the sign-up links.
+    // The button follows him: it is what is pressed, and what takes focus. In
+    // the air it reaches from his head down to the ground he left, so that
+    // quick presses in one place all land on him, wherever in his jump he is.
+    // It never goes down past the ground when he lies down: under the ground
+    // are the sign-up links.
     const width = ((RIGHT - LEFT) / HEIGHT) * ground.size;
     const raised = Math.max(0, frame.lift);
     this.button.style.width = `${width.toFixed(1)}px`;
-    this.button.style.height = `${ground.size.toFixed(1)}px`;
+    this.button.style.height = `${(ground.size + raised).toFixed(1)}px`;
     this.button.style.translate =
       `${(frame.x - width / 2).toFixed(1)}px ` +
       `${(ground.y - raised - ground.size).toFixed(1)}px`;

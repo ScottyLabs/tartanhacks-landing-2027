@@ -3,7 +3,8 @@ import { REST, type Pose } from './pose.ts';
 /**
  * How Bark behaves: he follows the pointer along the ground, turns to face
  * it, trots or runs depending on how far behind he is, and jumps when
- * pressed. Left alone long enough he lies down and sleeps. This file knows
+ * pressed. Left alone long enough he lies down and sleeps; wound up, he gets
+ * the zoomies; pressed over and over, he turns a backflip. This file knows
  * nothing about the page; it turns time and a pointer position into a pose
  * to draw, which keeps it testable.
  *
@@ -116,6 +117,26 @@ const STARTLE = 0.2;
 /** What a frame carries when he is not snoring: the same empty list every time. */
 const NO_SNORES: Snore[] = [];
 
+/* ---------- The zoomies and the backflip. Distances are in body heights. ---------- */
+
+/** With the zoomies he runs this many times as fast as his full run. */
+const ZOOM = 1.7;
+/**
+ * He tears back and forth past where he stood: out this far one way, back
+ * past it the other, and so on, ending where he began.
+ */
+const ZOOM_RUNS = [2.6, -2.2, 2.4, -1.8, 0];
+/** A run that has not got there in this long is given up: he has met the edge of his ground. */
+const ZOOM_RUN_S = 1.1;
+/** They end with a hop this high. */
+const HAPPY_HOP = 0.22;
+/** This many presses, each within this long of the last, earn a backflip. */
+const PRESSES = 5;
+const QUICK_S = 0.5;
+/** The backflip: he gathers longer, goes higher, and turns right over backwards. */
+const FLIP_CROUCH_S = 0.16;
+const FLIP_HEIGHT = 1.35;
+
 const smooth01 = (t: number): number => {
   const c = Math.min(1, Math.max(0, t));
   return c * c * (3 - 2 * c);
@@ -200,6 +221,24 @@ export class Mind {
   private startled = false;
   private nextDream = 0;
 
+  /**
+   * The zoomies: which run he is on (none when below zero), where they began,
+   * which way the first run went, which way this one goes, and how long it has taken.
+   */
+  private zoomRun = -1;
+  private zoomHome = 0;
+  private zoomWay: 1 | -1 = 1;
+  private zoomDir = 0;
+  private zoomTime = 0;
+  /** Quick presses counted, and when the last one was. */
+  private presses = 0;
+  private pressedAt = -Infinity;
+  /** A backflip owed; one under way; how long he has been in the air, and will be. */
+  private flipDue = false;
+  private flipping = false;
+  private airFor = 0;
+  private airTotal = 1;
+
   constructor(x: number) {
     this.x = x;
   }
@@ -226,8 +265,18 @@ export class Mind {
     this.night = night;
   }
 
-  /** Asks for a jump. Ignored unless he is standing on the ground. Asleep, it wakes him instead. */
+  /**
+   * Asks for a jump. Ignored unless he is standing on the ground. Asleep, it
+   * wakes him instead. Asked five times in quick succession he turns a
+   * backflip, as soon as his feet are on the ground to take off from.
+   */
   jump(): void {
+    this.presses = this.clock - this.pressedAt <= QUICK_S ? this.presses + 1 : 1;
+    this.pressedAt = this.clock;
+    if (this.presses >= PRESSES) {
+      this.presses = 0;
+      this.flipDue = true;
+    }
     if (this.bed !== 'up') {
       this.rouse();
       return;
@@ -235,6 +284,21 @@ export class Mind {
     if (this.mode !== 'grounded') return;
     this.mode = 'crouching';
     this.modeTime = 0;
+  }
+
+  /**
+   * Gives him the zoomies: he tears back and forth past where he stands, a
+   * few times, and stops. Ignored if he has them already, is in bed, or is
+   * dressed for a part.
+   */
+  zoom(): void {
+    if (this.zoomRun >= 0 || this.bed !== 'up' || this.role !== null) return;
+    this.zoomRun = 0;
+    this.zoomHome = this.x;
+    this.zoomWay = this.heading;
+    this.zoomDir = 0;
+    this.zoomTime = 0;
+    this.ear.velocity += 3;
   }
 
   /** Gets him up. From lying down it is with a start: his snores burst, and he hops to his feet. */
@@ -268,7 +332,9 @@ export class Mind {
       this.laptop === 0 &&
       this.bed === 'up' &&
       Math.abs(this.lie.value) < 0.004 &&
-      Math.abs(this.yawn.value) < 0.01
+      Math.abs(this.yawn.value) < 0.01 &&
+      this.zoomRun < 0 &&
+      !this.flipDue
     );
   }
 
@@ -337,11 +403,54 @@ export class Mind {
     // pointer nor dresses for a part.
     this.bedtime(dt);
     const up = this.bed === 'up' && this.lie.value < 0.12;
-    const part = up ? this.role : null;
+
+    // --- The zoomies: one run after another, flat out, turning on the spot
+    // where each ends. With them he has no time for the pointer or a part.
+    let dash: number | null = null;
+    // A run that would take him off his ground stops at its edge instead, and
+    // so does the last, which ends where he began: those he slows into.
+    let slowing = false;
+    if (this.zoomRun >= 0) {
+      const aim = (): number => this.zoomHome + this.zoomWay * ZOOM_RUNS[this.zoomRun]! * size;
+      const to = (): number => clamp(aim(), ground.left, ground.right);
+      const short = (): boolean => this.zoomRun === ZOOM_RUNS.length - 1 || to() !== aim();
+      if (this.zoomDir === 0) this.zoomDir = to() >= this.x ? 1 : -1;
+      this.zoomTime += dt;
+      const left = (to() - this.x) * this.zoomDir;
+      if (left < (short() ? 0.12 : 0.3) * size || this.zoomTime > ZOOM_RUN_S) {
+        this.zoomRun += 1;
+        this.zoomTime = 0;
+        this.zoomDir = 0;
+        if (this.zoomRun >= ZOOM_RUNS.length) {
+          // Done: a hop, and he is himself again.
+          this.zoomRun = -1;
+          if (this.mode === 'grounded') {
+            this.mode = 'airborne';
+            this.rise = Math.sqrt(2 * GRAVITY * HAPPY_HOP) * size;
+            this.squash.velocity += 2;
+          }
+          this.ear.velocity += 3;
+        } else {
+          // He digs in to turn.
+          this.squash.velocity -= 1.4;
+        }
+      }
+      if (this.zoomRun >= 0) {
+        dash = to();
+        slowing = short();
+      }
+    }
+    const zooming = dash !== null;
+    const free = up && !zooming;
+    const part = free ? this.role : null;
 
     // --- Chase: head for the pointer, slowing as he closes in.
     let want = 0;
-    if (this.pointer && this.mode !== 'crouching' && up) {
+    if (dash !== null) {
+      // Flat out, turning at the last moment; or slowing to a stop.
+      const gap = dash - this.x;
+      want = Math.sign(gap) * Math.min(top * ZOOM, slowing ? Math.abs(gap) * 8 : Infinity);
+    } else if (this.pointer && this.mode !== 'crouching' && up) {
       const goal = clamp(this.pointer.x, ground.left, ground.right);
       const gap = goal - this.x;
       // Dressed for a part he holds his ground while the pointer wanders
@@ -362,7 +471,7 @@ export class Mind {
       // Left as it is.
     } else if (pace > 0.04) {
       this.heading = this.speed > 0 ? 1 : -1;
-    } else if (this.pointer && Math.abs(this.pointer.x - this.x) > 0.45 * size) {
+    } else if (free && this.pointer && Math.abs(this.pointer.x - this.x) > 0.45 * size) {
       this.heading = this.pointer.x > this.x ? 1 : -1;
     }
     this.facing += (this.heading - this.facing) * toward(dt, 0.055);
@@ -396,17 +505,28 @@ export class Mind {
       this.squash.velocity += 2.2;
     }
 
-    // --- Jump.
+    // --- Jump. A backflip is a jump he gathers longer for and goes higher in.
     let stretch = 1;
+    if (this.mode === 'grounded' && this.flipDue && up) {
+      // A backflip is owed, and his feet are on the ground to take off from.
+      this.mode = 'crouching';
+      this.modeTime = 0;
+    }
     if (this.mode === 'crouching') {
+      const flip = this.flipDue;
       this.modeTime += dt;
-      stretch = 0.85;
-      if (this.modeTime >= CROUCH_S) {
+      stretch = flip ? 0.78 : 0.85;
+      if (this.modeTime >= (flip ? FLIP_CROUCH_S : CROUCH_S)) {
         this.mode = 'airborne';
-        this.rise = LAUNCH * size;
-        this.squash.velocity += 2.8;
+        this.rise = (flip ? Math.sqrt(2 * GRAVITY * FLIP_HEIGHT) : LAUNCH) * size;
+        this.squash.velocity += flip ? 3.4 : 2.8;
+        this.airFor = 0;
+        this.airTotal = (2 * this.rise) / (GRAVITY * size);
+        this.flipping = flip;
+        this.flipDue = false;
       }
     } else if (this.mode === 'airborne') {
+      this.airFor += dt;
       this.height += this.rise * dt;
       this.rise -= GRAVITY * size * dt;
       stretch = 1 + 0.06 * clamp(Math.abs(this.rise) / (LAUNCH * size), 0, 1);
@@ -415,10 +535,14 @@ export class Mind {
         this.height = 0;
         this.rise = 0;
         this.mode = 'grounded';
+        this.flipping = false;
         this.squash.velocity -= 2.9 * impact;
         this.ear.velocity += 3 * impact;
         this.beard.velocity += 2.2 * impact;
       }
+    } else if (zooming) {
+      // With the zoomies he runs low.
+      stretch = 0.95;
     } else if (down) {
       // Asleep, he breathes slow and deep.
       stretch =
@@ -470,7 +594,7 @@ export class Mind {
 
     // --- Gaze: standing, he looks up at a pointer that is above and near him.
     let look = 0;
-    if (this.pointer && this.mode === 'grounded' && up) {
+    if (this.pointer && this.mode === 'grounded' && free) {
       const ahead = Math.abs(this.pointer.x - this.x);
       const above = this.pointer.y - 0.8 * size;
       const near = 1 - clamp((ahead - 1.2 * size) / (2 * size), 0, 1);
@@ -500,8 +624,10 @@ export class Mind {
 
     // --- Compose the pose.
     const pose: Pose = { ...REST };
-    const reach = (20 + 38 * pace) * this.gait;
-    const lift = (18 + 26 * pace) * this.gait;
+    // Faster than a full run, his legs go quicker, not further.
+    const swing = Math.min(pace, 1.1);
+    const reach = (20 + 38 * swing) * this.gait;
+    const lift = (18 + 26 * swing) * this.gait;
     const hind = this.stride;
     const fore = this.stride + Math.PI;
     // A foot travels back along the ground, then lifts and swings forward.
@@ -523,7 +649,7 @@ export class Mind {
     pose.foreLift += atKeys * (20 + 20 * tap * this.keys);
 
     const bounce = Math.sin(this.stride * 2);
-    pose.head = -this.gaze.value + this.gait * (0.03 * bounce + 0.045 * pace) - 0.12 * flight;
+    pose.head = -this.gaze.value + this.gait * (0.03 * bounce + 0.045 * swing) - 0.12 * flight;
     // He looks down at the screen and nods as he types; with the card he holds his head up.
     pose.head += 0.12 * this.laptop + 0.026 * atKeys * this.keys * Math.sin(this.typing * TAU * 4.75);
     pose.head -= 0.07 * held;
@@ -537,7 +663,7 @@ export class Mind {
     pose.ear -= 0.2 * yawning;
 
     // The body rises between footfalls, a little more the faster he goes.
-    const bob = this.gait * (0.006 + 0.014 * pace) * size * (0.5 - 0.5 * Math.cos(this.stride * 2));
+    const bob = this.gait * (0.006 + 0.014 * swing) * size * (0.5 - 0.5 * Math.cos(this.stride * 2));
 
     // Lying down, he goes onto his chest first, tipping forward about his
     // hind feet, which stay where they are; then his hips come down, and his
@@ -555,12 +681,21 @@ export class Mind {
     pose.headOut = HEAD_OUT * hips;
     pose.head += HEAD_TURN * lying;
 
+    // A backflip turns him right over backwards, once, between taking off
+    // and landing: slowly at first, fastest at the top, and slowly again to
+    // meet the ground feet first.
+    let over = 0;
+    if (this.flipping) {
+      const t = clamp(this.airFor / this.airTotal, 0, 1);
+      over = -TAU * t * t * t * (t * (6 * t - 15) + 10);
+    }
+
     return {
       x: this.x,
       lift: this.height + bob - sunk,
       facing: this.facing,
       squash: clamp(this.squash.value, 0.7, 1.2),
-      pitch: 0.05 * pace * this.gait - 0.09 * flight + tilt,
+      pitch: 0.05 * swing * this.gait - 0.09 * flight + tilt + over,
       pose,
       props: { card: clamp(this.card.value, 0, 1.15), laptop: this.laptop },
       asleep: down && lying > 0.9,

@@ -408,3 +408,153 @@ test('asleep or going to bed he never strays far from the mark', () => {
     assert.ok(f.lift > -0.35 * ground.size, `lift ${f.lift}`);
   }
 });
+
+/* ---------- The zoomies and the backflip ---------- */
+
+/** How fast he is going in each frame, in pixels a second, and how often he turned back. */
+function dashes(frames: Frame[]): { fastest: number; turns: number } {
+  let fastest = 0;
+  let turns = 0;
+  let way = 0;
+  for (let i = 1; i < frames.length; i++) {
+    const moved = frames[i]!.x - frames[i - 1]!.x;
+    fastest = Math.max(fastest, Math.abs(moved) * 60);
+    if (Math.abs(moved) * 60 < 1.5 * ground.size) continue;
+    const now = Math.sign(moved);
+    if (way !== 0 && now !== way) turns += 1;
+    way = now;
+  }
+  return { fastest, turns };
+}
+
+test('given the zoomies he tears back and forth past where he stood, and stops', () => {
+  const mind = new Mind(500);
+  mind.watch({ x: 500, y: 0 });
+  run(mind, 0.5);
+  mind.zoom();
+  // The pointer goes off to one side meanwhile: he has no time for it.
+  mind.watch({ x: 900, y: 0 });
+  const frames = run(mind, 2.8);
+  assert.equal(mind.resting, false);
+
+  const { fastest, turns } = dashes(frames);
+  const fullRun = 5.6 * ground.size;
+  assert.ok(fastest > 1.4 * fullRun && fastest < 2 * fullRun, `faster than he ever runs: ${fastest / fullRun} of a full run`);
+  assert.ok(turns >= 3, `back and forth: ${turns} turns`);
+  const xs = frames.map((f) => f.x);
+  assert.ok(Math.max(...xs) > 500 + 2 * ground.size && Math.min(...xs) < 500 - 1.5 * ground.size, 'either side of where he stood');
+  // All of it over in a couple of seconds.
+  const hop = frames.findIndex((f) => f.lift > 0.1 * ground.size);
+  assert.ok(hop > 0 && hop / 60 < 2.6, `done in ${hop / 60} seconds`);
+  assert.ok(Math.min(...xs) < 500 - ground.size, 'away from the pointer too');
+  for (const f of frames) {
+    assert.ok(f.x >= ground.left - 1 && f.x <= ground.right + 1);
+    assert.ok(f.squash >= 0.7 && f.squash <= 1.2);
+    assert.ok(Math.abs(f.pitch) < 0.2);
+    // On the ground his legs reach no further than at a full run: they go quicker instead.
+    if (f.lift < 0.5) assert.ok(Math.abs(f.pose.hindReach) < 70 && Math.abs(f.pose.foreReach) < 70);
+    assert.ok(f.lift < 0.3 * ground.size, 'no more than a hop');
+  }
+  assert.ok(Math.max(...frames.map((f) => f.lift)) > 0.1 * ground.size, 'they end with a hop');
+
+  // Then he is himself: after the pointer, and standing as the mark.
+  const end = last(run(mind, 4));
+  assert.ok(Math.abs(end.x - 900) < ground.size * 0.2);
+  assert.ok(Math.abs(end.lift) < 0.5 && Math.abs(end.pitch) < 0.005);
+  assert.ok(Math.abs(end.pose.hindReach) < 1 && Math.abs(end.pose.foreReach) < 1);
+});
+
+test('at the edge of his ground the zoomies turn back where the ground ends', () => {
+  const mind = new Mind(900);
+  mind.watch({ x: 900, y: 0 });
+  run(mind, 0.5);
+  mind.zoom();
+  const frames = run(mind, 3.5);
+  assert.ok(frames.every((f) => f.x <= ground.right + 1 && f.x >= ground.left - 1));
+  assert.ok(dashes(frames).turns >= 2);
+  assert.ok(Math.abs(last(frames).x - 900) < ground.size * 0.2, 'and he ends where the pointer is');
+});
+
+test('dressed for a part, or in bed, he does not get the zoomies', () => {
+  const judge = new Mind(500);
+  judge.watch({ x: 500, y: 0 });
+  judge.dress('judge');
+  run(judge, 1.5);
+  judge.zoom();
+  const dressed = run(judge, 1.5);
+  assert.ok(dressed.every((f) => Math.abs(f.x - 500) < 2 && f.props.card > 0.9));
+
+  const sleeper = asleep();
+  sleeper.zoom();
+  assert.ok(idle(sleeper, 1.5, 70).every((f) => f.asleep && Math.abs(f.x - 400) < 1));
+});
+
+/** Presses Bark a number of times, so many seconds apart, and returns every frame until he is done. */
+function pressed(mind: Mind, times: number, apart: number, then = 3): Frame[] {
+  const frames: Frame[] = [];
+  for (let i = 0; i < times; i++) {
+    mind.jump();
+    frames.push(...run(mind, apart));
+  }
+  frames.push(...run(mind, then));
+  return frames;
+}
+
+test('five quick presses earn a backflip: right over backwards, higher than a jump', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  run(mind, 0.5);
+  const frames = pressed(mind, 5, 0.13);
+
+  const over = frames.filter((f) => f.pitch < -0.5);
+  assert.ok(over.length > 10, 'he goes over');
+  assert.ok(Math.min(...over.map((f) => f.pitch)) < -6, 'all the way round');
+  // Backwards the whole way: the turn only ever grows, until he lands.
+  for (let i = 1; i < over.length; i++) assert.ok(over[i]!.pitch <= over[i - 1]!.pitch + 1e-9);
+  const height = Math.max(...over.map((f) => f.lift)) / ground.size;
+  assert.ok(height > 1.2 && height < 1.5, `higher than a jump: ${height} of his height`);
+  // Upside down, every part of him is clear of the ground.
+  for (const f of over) {
+    if (f.pitch < -2.2 && f.pitch > -4.1) assert.ok(f.lift > 0.5 * ground.size, `upside down at ${f.lift}`);
+  }
+  // Once only.
+  let flips = 0;
+  for (let i = 1; i < frames.length; i++) {
+    if (frames[i]!.pitch < -Math.PI && frames[i - 1]!.pitch >= -Math.PI) flips += 1;
+  }
+  assert.equal(flips, 1);
+
+  const end = last(frames);
+  assert.ok(Math.abs(end.lift) < 0.5 && Math.abs(end.pitch) < 0.005, 'on his feet, upright');
+  assert.ok(Math.abs(end.x - 400) < 2, 'where he stood');
+  assert.ok(Math.abs(end.squash - 1) < 0.03);
+});
+
+test('four quick presses, or five slow ones, are only jumps', () => {
+  for (const [times, apart] of [
+    [4, 0.13],
+    [5, 0.7],
+    [9, 0.7],
+  ] as const) {
+    const mind = new Mind(400);
+    mind.watch({ x: 400, y: 0 });
+    run(mind, 0.5);
+    const frames = pressed(mind, times, apart);
+    assert.ok(frames.every((f) => Math.abs(f.pitch) < 0.2), `${times} presses ${apart}s apart`);
+    assert.ok(Math.max(...frames.map((f) => f.lift)) < 1.25 * ground.size);
+  }
+});
+
+test('pressed five times as he sleeps, he wakes and then flips', () => {
+  const mind = asleep();
+  const frames: Frame[] = [];
+  for (let i = 0; i < 5; i++) {
+    mind.jump();
+    frames.push(...idle(mind, 0.12, 0));
+  }
+  frames.push(...idle(mind, 3, 0.6));
+  assert.equal(frames[0]!.asleep, false);
+  assert.ok(Math.min(...frames.map((f) => f.pitch)) < -6, 'over he goes');
+  const end = last(frames);
+  assert.ok(Math.abs(end.lift) < 0.5 && Math.abs(end.pitch) < 0.005);
+});
