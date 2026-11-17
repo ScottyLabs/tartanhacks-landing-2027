@@ -1,6 +1,7 @@
+import type { Place } from './heist.ts';
 import { smallHours } from './hours.ts';
 import { LEAN_ABOUT, Mind, type Frame, type Ground, type Role } from './mind.ts';
-import { draw, REST } from './pose.ts';
+import { buildFor, draw, REST } from './pose.ts';
 import { drawProps } from './props.ts';
 import { Whirl } from './whirl.ts';
 import { HEIGHT, LEFT, MITER_LIMIT, RIGHT, STROKE } from './shape.ts';
@@ -19,12 +20,42 @@ export interface BarkOptions {
   parts?: readonly { element: HTMLElement; role: Role }[];
 }
 
+/**
+ * Something on the page that Bark can make off with: the page's side of it.
+ * He works out where it goes, from the moment it is knocked loose until it is
+ * back; the page says where it belongs, and draws it where it is told.
+ */
+export interface Loot {
+  /**
+   * Where it belongs: its middle, in the window's coordinates, and how tall
+   * it is. Asked every frame, since the page can move under it.
+   */
+  home(): { x: number; y: number; tall: number };
+  /**
+   * Told on every frame it is away where it is now: its middle, on the
+   * stage, with how far it has turned and how much of its width shows.
+   */
+  move(place: Readonly<Place>): void;
+  /** Told once, when it is back where it belongs. */
+  land(): void;
+}
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Far enough to cover the drawing in every pose, and the page at any size. */
 const FAR = 4000;
 
+/**
+ * His white reaches this far past his line, in the mark's units: about two
+ * pixels. On paper it does not show. In front of anything in ink it keeps
+ * his outline whole.
+ */
+const HALO = 22;
+
 /** A bark is drawn as three short strokes thrown out from his mouth, this far apart, in radians. */
 const BARK_SPREAD = 0.44;
+
+/** His ground as the page has it: with where it lies on the stage, and where the stage lies in the window. */
+type Stage = Ground & { y: number; originX: number; originY: number };
 
 /** What his button says he is for: awake, and asleep. */
 const AWAKE = 'Bark, the ScottyLabs dog. Press to make him jump.';
@@ -45,8 +76,9 @@ function svg<K extends keyof SVGElementTagNameMap>(
 /**
  * Bark on the page: he walks along the top edge of the ground element after
  * the pointer, jumps when pressed, gets the zoomies when the pointer is
- * whirled about, and goes to sleep when the visitor has done nothing for a
- * while. The drawing is rebuilt from his pose every frame.
+ * whirled about, goes to sleep when the visitor has done nothing for a
+ * while, and makes off with what is knocked loose for him. The drawing is
+ * rebuilt from his pose every frame.
  * Squashing and turning move its points; the only transform on it is a
  * uniform one, so his line keeps its weight however he moves.
  */
@@ -93,6 +125,8 @@ export class Bark {
   private readonly whirl = new Whirl();
   /** Something on the page he has been set to keep watch over, in the window's coordinates. */
   private guarding: { x: number; y: number } | null = null;
+  /** Something he is making off with. */
+  private loot: Loot | null = null;
 
   constructor(options: BarkOptions) {
     this.stage = options.stage;
@@ -123,7 +157,7 @@ export class Bark {
     const grounded = svg('g', { 'clip-path': 'url(#bark-above-ground)' });
     this.body = svg('g');
     const clipped = svg('g', { 'clip-path': 'url(#bark-soles)' });
-    this.fill = svg('path', { class: 'bark__fill' });
+    this.fill = svg('path', { class: 'bark__fill', 'stroke-width': String(STROKE + 2 * HALO) });
     this.lines = [0, 1, 2].map(() =>
       svg('path', {
         class: 'bark__line',
@@ -177,6 +211,19 @@ export class Bark {
     this.mind?.bark(times);
   }
 
+  /**
+   * Knocks something loose for him to make off with. From here until it is
+   * back he says where it is, every frame. False, and nothing happens, if he
+   * is not there to take it or is already making off with something.
+   */
+  steal(loot: Loot): boolean {
+    if (!this.mind || this.loot) return false;
+    const ground = this.measure();
+    if (!this.mind.steal(this.onGround(loot.home(), ground), ground)) return false;
+    this.loot = loot;
+    return true;
+  }
+
   /** Shows Bark standing still, for visitors who asked for less motion. */
   stand(): void {
     const place = (): void => {
@@ -194,6 +241,8 @@ export class Bark {
           barkAim: 0,
           asleep: false,
           snores: [],
+          mouth: { x: 0, y: 0 },
+          loot: null,
         },
         ground,
       );
@@ -280,8 +329,13 @@ export class Bark {
     requestAnimationFrame(this.frame);
   }
 
+  /** A place in the window, measured as Bark's mind measures: along his ground, and above it. */
+  private onGround<T extends { x: number; y: number }>(point: T, ground: Stage): T {
+    return { ...point, x: point.x - ground.originX, y: ground.y - (point.y - ground.originY) };
+  }
+
   /** Where the ground is and how big Bark should be, in stage coordinates. */
-  private measure(): Ground & { y: number; originX: number; originY: number } {
+  private measure(): Stage {
     const stage = this.stage.getBoundingClientRect();
     const band = this.ground.getBoundingClientRect();
     const size = this.sizer.getBoundingClientRect().height || 64;
@@ -314,35 +368,41 @@ export class Bark {
 
     const ground = this.measure();
     mind.dress(this.hovered ?? this.focused?.role ?? null);
-    const guarding = this.guarding;
-    mind.guard(
-      guarding
-        ? { x: guarding.x - ground.originX, y: ground.y - (guarding.y - ground.originY) }
-        : null,
-    );
+    mind.guard(this.guarding ? this.onGround(this.guarding, ground) : null);
+    if (this.loot) mind.home(this.onGround(this.loot.home(), ground));
     if (this.focused && !this.hovered) {
       // With the keyboard there is no pointer to follow: go to the element.
       const box = this.focused.element.getBoundingClientRect();
       mind.watch({ x: box.left + box.width / 2 - ground.originX, y: 0 });
     } else if (this.pointer) {
-      mind.watch({
-        x: this.pointer.x - ground.originX,
-        y: ground.y - (this.pointer.y - ground.originY),
-      });
+      mind.watch(this.onGround(this.pointer, ground));
     } else {
       mind.watch({ x: ground.left + (ground.right - ground.left) * this.home, y: ground.size * 0.8 });
     }
-    this.render(mind.step(Math.min(0.05, elapsed / 1000), ground), ground);
+    const frame = mind.step(Math.min(0.05, elapsed / 1000), ground);
+    this.render(frame, ground);
+    this.carry(frame, ground);
   };
 
-  private render(frame: Frame, ground: Ground & { y: number }): void {
+  /** Tells what he is making off with where it has got to; or, once it is back, that it is. */
+  private carry(frame: Frame, ground: Stage): void {
+    const loot = this.loot;
+    if (!loot) return;
+    if (!frame.loot) {
+      this.loot = null;
+      loot.land();
+      return;
+    }
+    // On the stage, down is positive.
+    loot.move({ ...frame.loot, y: ground.y - frame.loot.y });
+  }
+
+  private render(frame: Frame, ground: Stage): void {
     const scale = ground.size / HEIGHT;
 
     // Squashing keeps his volume: what he loses in height he gains in width.
-    const drawing = draw(frame.pose, {
-      wide: frame.facing * (1 + (1 - frame.squash) * 0.55),
-      tall: frame.squash,
-    });
+    const build = buildFor(frame.facing, frame.squash);
+    const drawing = draw(frame.pose, build);
     this.fill.setAttribute('d', drawing.fill);
     drawing.lines.forEach((d, i) => this.lines[i]?.setAttribute('d', d));
     // Everything above the soles: down to one height left of his middle, and
@@ -355,7 +415,6 @@ export class Bark {
     );
     this.floor.setAttribute('height', (FAR + ground.y).toFixed(2));
 
-    const build = { wide: frame.facing * (1 + (1 - frame.squash) * 0.55), tall: frame.squash };
     const props = drawProps(frame.props, drawing.mouth, frame.pose.head, build);
     this.laptop.setAttribute('d', props.laptop);
     this.stick.setAttribute('d', props.stick);
@@ -385,12 +444,8 @@ export class Bark {
     // A bark: three short strokes of his own line, thrown out from his mouth.
     let woof = '';
     if (frame.bark > 0) {
-      // His mouth, placed as the drawing is: scaled, leant, and set on the ground.
-      const turn = (lean * Math.PI) / 180;
-      const px = drawing.mouth.x * scale;
-      const py = drawing.mouth.y * scale + LEAN_ABOUT * ground.size;
-      const mx = frame.x + px * Math.cos(turn) - py * Math.sin(turn);
-      const my = top - LEAN_ABOUT * ground.size + px * Math.sin(turn) + py * Math.cos(turn);
+      const mx = frame.mouth.x;
+      const my = ground.y - frame.mouth.y;
       const side = frame.facing >= 0 ? 1 : -1;
       const gone = 1 - frame.bark;
       const from = (0.2 + 0.26 * gone) * ground.size;

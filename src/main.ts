@@ -2,6 +2,7 @@ import { Bark } from './bark/bark.ts';
 import { startCountdown } from './countdown.ts';
 import { Field } from './field/field.ts';
 import { Redaction } from './redaction/redaction.ts';
+import { Theft } from './theft/theft.ts';
 
 const root = document.documentElement;
 
@@ -57,6 +58,14 @@ async function main(): Promise<void> {
       onHold: (at) => bark?.guard(at),
       onSnap: () => bark?.speak(2),
     });
+  }
+
+  // A digit of the seconds can be knocked out of the countdown, and Bark makes
+  // off with it. Without him, or for visitors who asked for less motion, the
+  // digits stay where they are.
+  const seconds = countdown?.querySelector<HTMLElement>('[data-unit="seconds"]');
+  if (stage && band && seconds && bark && !still) {
+    new Theft({ stage, band, seconds, steal: (loot) => bark.steal(loot) });
   }
 
   if (!field) {

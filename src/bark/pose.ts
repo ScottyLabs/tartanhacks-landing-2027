@@ -35,6 +35,14 @@ export interface Build {
 
 export const UPRIGHT: Readonly<Build> = { wide: 1, tall: 1 };
 
+/**
+ * His build for the way he faces (1 right .. -1 left) and how far he is
+ * squashed (1 at rest): what he loses in height he gains in width.
+ */
+export function buildFor(facing: number, squash: number): Build {
+  return { wide: facing * (1 + (1 - squash) * 0.55), tall: squash };
+}
+
 export const REST: Readonly<Pose> = {
   hindReach: 0,
   hindLift: 0,
@@ -142,7 +150,7 @@ function trace(
 const MOUTH = { x: 400, y: -388 } as const;
 
 /** Where his mouth is in a pose and a build: it turns with his head. */
-function mouthIn(pose: Pose, build: Build): { x: number; y: number } {
+export function mouthIn(pose: Pose, build: Build): { x: number; y: number } {
   const dx = MOUTH.x - NECK.x;
   const dy = MOUTH.y - NECK.y;
   const cos = Math.cos(pose.head);

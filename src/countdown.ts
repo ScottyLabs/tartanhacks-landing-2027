@@ -43,6 +43,26 @@ const UNITS = ['days', 'hours', 'minutes', 'seconds'] as const;
 type Unit = (typeof UNITS)[number];
 
 /**
+ * Sets `text` in a cell, one digit to an element. The elements stay the same
+ * from one second to the next and only what they say changes, so that
+ * anything else that has hold of a digit keeps hold of it.
+ */
+function setDigits(cell: HTMLElement, text: string): void {
+  // The first time round the cell holds the page's placeholder, as plain text.
+  if (cell.childElementCount === 0) cell.textContent = '';
+  for (let i = 0; i < text.length; i++) {
+    let digit = cell.children[i];
+    if (!digit) {
+      digit = document.createElement('span');
+      digit.className = 'countdown__digit';
+      cell.append(digit);
+    }
+    if (digit.textContent !== text[i]) digit.textContent = text[i]!;
+  }
+  while (cell.childElementCount > text.length) cell.lastElementChild?.remove();
+}
+
+/**
  * Runs the countdown inside `root`, counting to the moment in the
  * `datetime` attribute of `timeEl`. Returns a function that stops it.
  */
@@ -69,15 +89,7 @@ export function startCountdown(root: HTMLElement, timeEl: HTMLTimeElement): () =
       if (shown.get(unit) === text) continue;
       shown.set(unit, text);
       const cell = cells.get(unit);
-      if (!cell) continue;
-      cell.replaceChildren(
-        ...Array.from(text, (digit) => {
-          const span = document.createElement('span');
-          span.className = 'countdown__digit';
-          span.textContent = digit;
-          return span;
-        }),
-      );
+      if (cell) setDigits(cell, text);
     }
 
     // Refresh the spoken description once an hour, not once a second.

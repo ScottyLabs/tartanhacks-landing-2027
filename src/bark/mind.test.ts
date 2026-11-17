@@ -611,3 +611,156 @@ test('asleep, he wakes to bark', () => {
   assert.equal(frames[0]!.asleep, false);
   assert.ok(frames.some((f) => f.bark === 1));
 });
+
+/* ---------- Making off with something ---------- */
+
+/** Under his ground, as the countdown is under the band; and as tall as one of its digits. */
+const HOME = { x: 500, y: -280, tall: 42 };
+
+/** A Bark standing over what is about to be knocked loose, with the pointer on it. */
+function overIt(): Mind {
+  const mind = new Mind(500);
+  mind.watch({ x: HOME.x, y: HOME.y });
+  run(mind, 1);
+  return mind;
+}
+
+/** True when the thing is in his mouth: within its own height of it. */
+const inMouth = (frame: Frame): boolean =>
+  frame.loot !== null &&
+  Math.hypot(frame.loot.x - frame.mouth.x, frame.loot.y - frame.mouth.y) < HOME.tall;
+
+test('his mouth is where the drawing puts it, however he stands', () => {
+  const mind = new Mind(400);
+  mind.watch({ x: 400, y: 0 });
+  const still = last(run(mind, 1));
+  // Standing: ahead of his middle by about half his height, and a little over half way up him.
+  assert.ok(Math.abs(still.mouth.x - (400 + 0.51 * ground.size)) < 2, `ahead: ${still.mouth.x}`);
+  assert.ok(Math.abs(still.mouth.y - 0.56 * ground.size) < 2, `up: ${still.mouth.y}`);
+  // Facing the other way it is on the other side of him.
+  mind.watch({ x: 100, y: 0 });
+  const turned = last(run(mind, 3));
+  assert.ok(Math.abs(turned.mouth.x - (turned.x - 0.51 * ground.size)) < 2);
+  // In the air it goes up with him.
+  mind.jump();
+  const top = Math.max(...run(mind, 1).map((f) => f.mouth.y));
+  assert.ok(top > 1.4 * ground.size, `at the top of a jump: ${top}`);
+});
+
+test('given something to make off with, he takes it in his mouth, plays, and ends as he began', () => {
+  const mind = overIt();
+  assert.equal(mind.steal(HOME, ground), true);
+  assert.equal(mind.steal(HOME, ground), false, 'one thing at a time');
+  const frames = run(mind, 14);
+
+  // It starts where it belongs and ends there: from then on there is nothing.
+  assert.ok(Math.hypot(frames[0]!.loot!.x - HOME.x, frames[0]!.loot!.y - HOME.y) < 30);
+  const home = frames.findIndex((f) => f.loot === null);
+  assert.ok(home > 0 && home < 10 * 60, `home after ${home / 60}s`);
+  assert.ok(frames.slice(home).every((f) => f.loot === null));
+  const arriving = frames[home - 1]!.loot!;
+  assert.ok(Math.hypot(arriving.x - HOME.x, arriving.y - HOME.y) < 30, 'it came home, not just to an end');
+
+  // In between he had it in his mouth for seconds, ran off with it, and bowed.
+  const held = frames.filter(inMouth);
+  assert.ok(held.length > 2 * 60, `in his mouth for ${held.length / 60}s`);
+  const took = frames.findIndex(inMouth);
+  assert.ok(took > 60, 'not before it had landed and he had gone to it');
+  const far = Math.max(...held.map((f) => Math.abs(f.x - frames[took]!.x)));
+  assert.ok(far > 3 * ground.size, `he made off with it: ${far}`);
+  assert.ok(Math.max(...held.map((f) => f.pitch)) > 0.1, 'bowing, front down');
+  assert.ok(Math.min(...held.map((f) => f.lift)) < -2, 'with his chest toward the ground');
+
+  // And he is himself again: standing, unbowed, the mark.
+  const end = last(frames);
+  assert.ok(Math.abs(end.lift) < 0.5 && Math.abs(end.pitch) < 0.01, 'on his feet');
+  assert.ok(Math.abs(end.pose.foreReach) < 1 && Math.abs(end.pose.head) < 0.3, 'his legs under him');
+  assert.ok(Math.abs(end.squash - 1) < 0.02);
+  // He goes after the pointer as before.
+  mind.watch({ x: 850, y: 0 });
+  assert.ok(Math.abs(last(run(mind, 3)).x - 850) < 0.2 * ground.size);
+});
+
+test('coming up, and lying on his ground, it is never over any part of him', () => {
+  for (const [from, to] of [
+    [100, 500],
+    [900, 500],
+    [500, 500],
+    [520, 500],
+    [60, 60],
+    [940, 940],
+  ] as const) {
+    // He runs to stand over it, from either side or from where he is, and it is knocked loose.
+    const mind = new Mind(from);
+    const home = { ...HOME, x: to };
+    mind.watch({ x: home.x, y: home.y });
+    run(mind, 3);
+    mind.steal(home, ground);
+    const frames = run(mind, 14);
+    const took = frames.findIndex(inMouth);
+    assert.ok(took > 0, `he took it, having come from ${from} to ${to}`);
+    for (const f of frames.slice(0, took - 12)) {
+      // Above his ground, or half way up through it.
+      if (f.loot!.y < 0) continue;
+      const apart = Math.abs(f.loot!.x - f.x) - HOME.tall / 2;
+      assert.ok(apart > 0.58 * ground.size, `from ${from} to ${to}: clear of him by ${apart}`);
+    }
+  }
+});
+
+test('a press on him while he has it catches him, rather than making him jump', () => {
+  const mind = overIt();
+  mind.steal(HOME, ground);
+  let frames = run(mind, 2.6);
+  assert.ok(inMouth(last(frames)), 'he has it');
+  mind.jump();
+  frames = run(mind, 5);
+  assert.ok(Math.max(...frames.map((f) => f.lift)) < 0.3 * ground.size, 'a start, not a jump');
+  const home = frames.findIndex((f) => f.loot === null);
+  assert.ok(home > 0 && home < 4 * 60, `home ${home / 60}s after the press`);
+  // Five quick presses do not turn him over while he has it, either.
+  const again = overIt();
+  again.steal(HOME, ground);
+  run(again, 2.6);
+  const pressedOn = pressed(again, 5, 0.1, 6);
+  assert.ok(Math.max(...pressedOn.map((f) => Math.abs(f.pitch))) < 1, 'no backflip');
+  assert.equal(last(pressedOn).loot, null);
+});
+
+test('with something to make off with he has no time for a part, the zoomies or bed', () => {
+  const mind = overIt();
+  mind.steal(HOME, ground);
+  const busy: Frame[] = [];
+  for (let i = 0; i < 14 * 60; i++) {
+    // Everything at once: a part to dress for, the zoomies, and a visitor long gone.
+    mind.dress('judge');
+    mind.zoom();
+    mind.rest(100 + i / 60, false);
+    const frame = mind.step(1 / 60, ground);
+    if (frame.loot === null) break;
+    busy.push(frame);
+  }
+  assert.ok(busy.length > 4 * 60 && busy.length < 12 * 60, `it took ${busy.length / 60}s`);
+  assert.ok(busy.every((f) => f.props.card < 0.01), 'no card while he has it');
+  assert.ok(busy.every((f) => !f.asleep), 'awake while he has it');
+  for (let i = 1; i < busy.length; i++) {
+    const speed = Math.abs(busy[i]!.x - busy[i - 1]!.x) * 60;
+    assert.ok(speed < 1.45 * 5.6 * ground.size, `no zoomies: ${speed / ground.size} heights a second`);
+  }
+  // Once it is home, the part he was asked to dress for is his.
+  mind.rest(0, false);
+  const after = last(run(mind, 2));
+  assert.equal(after.loot, null);
+  assert.ok(after.props.card > 0.9, `the card is out: ${after.props.card}`);
+});
+
+test('asleep, he wakes for it', () => {
+  const mind = asleep();
+  assert.ok(last(run(mind, 0.1)).asleep);
+  assert.equal(mind.steal({ x: 400, y: -280, tall: 42 }, ground), true);
+  const frames = run(mind, 14);
+  assert.equal(frames[30]!.asleep, false, 'awake within half a second');
+  assert.equal(frames[30]!.snores.every((s) => s.size < 12), true, 'his snores gone or going');
+  assert.ok(frames.some(inMouth), 'and he takes it');
+  assert.equal(last(frames).loot, null);
+});

@@ -1,12 +1,16 @@
-import { REST, type Pose } from './pose.ts';
+import { Heist, type Home, type Place } from './heist.ts';
+import { clamp, smooth01, Spring, toward } from './motion.ts';
+import { buildFor, mouthIn, REST, type Pose } from './pose.ts';
+import { HEIGHT } from './shape.ts';
 
 /**
  * How Bark behaves: he follows the pointer along the ground, turns to face
  * it, trots or runs depending on how far behind he is, and jumps when
  * pressed. Left alone long enough he lies down and sleeps; wound up, he gets
- * the zoomies; pressed over and over, he turns a backflip. This file knows
- * nothing about the page; it turns time and a pointer position into a pose
- * to draw, which keeps it testable.
+ * the zoomies; pressed over and over, he turns a backflip; and given the
+ * chance he makes off with something, which heist.ts plans for him. This
+ * file knows nothing about the page; it turns time and a pointer position
+ * into a pose to draw, which keeps it testable.
  *
  * Distances are in CSS pixels unless they are part of a Pose.
  */
@@ -63,6 +67,10 @@ export interface Frame {
   asleep: boolean;
   /** The snores now in the air: none, or a few. */
   snores: readonly Snore[];
+  /** His mouth, along the ground and above it: where a bark starts, and where he holds what he carries. */
+  mouth: { x: number; y: number };
+  /** Something he is making off with, wherever it has got to: along the ground and above it. Null when there is nothing. */
+  loot: Readonly<Place> | null;
 }
 
 const TAU = Math.PI * 2;
@@ -128,6 +136,15 @@ const BARK_EVERY_S = 0.3;
 /** The first of them comes with a start: a hop this high. */
 const START = 0.14;
 
+/* ---------- Bowing, and putting his nose to the ground. ---------- */
+
+/** A bow tips him forward by this many radians, and slides his forelegs out ahead by this much, in the mark's units. */
+const BOW = 0.135;
+const BOW_REACH = 80;
+/** Bowing he looks up, by this many radians; nose to the ground, his head goes down by this many. */
+const BOW_LOOKS_UP = 0.14;
+const NOSE_DOWN = 0.3;
+
 /* ---------- The zoomies and the backflip. Distances are in body heights. ---------- */
 
 /** With the zoomies he runs this many times as fast as his full run. */
@@ -147,35 +164,6 @@ const QUICK_S = 0.5;
 /** The backflip: he gathers longer, goes higher, and turns right over backwards. */
 const FLIP_CROUCH_S = 0.16;
 const FLIP_HEIGHT = 1.35;
-
-const smooth01 = (t: number): number => {
-  const c = Math.min(1, Math.max(0, t));
-  return c * c * (3 - 2 * c);
-};
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
-/** The fraction of the way to a target to move in `dt`, settling in about `time` seconds. */
-const toward = (dt: number, time: number): number => 1 - Math.exp(-dt / time);
-
-/** A value on a spring: it overshoots and settles, which is what makes soft parts look soft. */
-class Spring {
-  value: number;
-  velocity = 0;
-
-  constructor(value: number) {
-    this.value = value;
-  }
-
-  step(target: number, stiffness: number, damping: number, dt: number): void {
-    // Two half steps keep a stiff spring stable on a slow frame.
-    for (let i = 0; i < 2; i++) {
-      const h = dt / 2;
-      this.velocity += ((target - this.value) * stiffness - this.velocity * damping) * h;
-      this.value += this.velocity * h;
-    }
-  }
-}
 
 export class Mind {
   private x: number;
@@ -257,6 +245,12 @@ export class Mind {
   private airFor = 0;
   private airTotal = 1;
 
+  /** Something he is making off with, if anything: the theft plans, and he carries it out. */
+  private readonly heist = new Heist();
+  /** How far he is bowed (0 standing .. 1), and where his nose is (1 on the ground .. -1 thrown up). */
+  private readonly bow = new Spring(0);
+  private readonly nose = new Spring(0);
+
   constructor(x: number) {
     this.x = x;
   }
@@ -286,9 +280,15 @@ export class Mind {
   /**
    * Asks for a jump. Ignored unless he is standing on the ground. Asleep, it
    * wakes him instead. Asked five times in quick succession he turns a
-   * backflip, as soon as his feet are on the ground to take off from.
+   * backflip, as soon as his feet are on the ground to take off from. With
+   * something he has made off with in his mouth, he is caught instead, and
+   * takes it back.
    */
   jump(): void {
+    if (this.heist.on) {
+      this.heist.caught();
+      return;
+    }
     this.presses = this.clock - this.pressedAt <= QUICK_S ? this.presses + 1 : 1;
     this.pressedAt = this.clock;
     if (this.presses >= PRESSES) {
@@ -322,12 +322,34 @@ export class Mind {
   }
 
   /**
+   * Knocks something loose from where it belongs, under his ground, for him
+   * to make off with: it comes up onto his ground, he takes it, keeps away
+   * with it while he is chased, and in the end sends it home. Asleep, he
+   * wakes for it. False, and nothing happens, if he is already making off
+   * with something.
+   */
+  steal(home: Home, ground: Ground): boolean {
+    if (!this.heist.begin(home, { x: this.x, facing: this.facing }, ground)) return false;
+    this.rouse();
+    this.zoomRun = -1;
+    this.flipDue = false;
+    this.presses = 0;
+    this.ear.velocity += 2.2;
+    return true;
+  }
+
+  /** Says where the thing he is making off with belongs now: the page can move under it. */
+  home(home: Home): void {
+    this.heist.belongs(home);
+  }
+
+  /**
    * Gives him the zoomies: he tears back and forth past where he stands, a
-   * few times, and stops. Ignored if he has them already, is in bed, or is
-   * dressed for a part.
+   * few times, and stops. Ignored if he has them already, is in bed, is
+   * dressed for a part, or is making off with something.
    */
   zoom(): void {
-    if (this.zoomRun >= 0 || this.bed !== 'up' || this.role !== null) return;
+    if (this.zoomRun >= 0 || this.bed !== 'up' || this.role !== null || this.heist.on) return;
     this.zoomRun = 0;
     this.zoomHome = this.x;
     this.zoomWay = this.heading;
@@ -372,7 +394,10 @@ export class Mind {
       !this.flipDue &&
       this.guarded === null &&
       this.barksDue === 0 &&
-      this.voice === 0
+      this.voice === 0 &&
+      !this.heist.on &&
+      Math.abs(this.bow.value) < 0.01 &&
+      Math.abs(this.nose.value) < 0.01
     );
   }
 
@@ -381,10 +406,13 @@ export class Mind {
     return this.resting || (this.bed === 'down' && this.slept > 0.5);
   }
 
-  /** Takes him a step further into going to bed, or gets him up the moment the visitor stirs. */
+  /**
+   * Takes him a step further into going to bed, or gets him up the moment
+   * the visitor stirs. He does not go to bed with something to make off with.
+   */
   private bedtime(dt: number): void {
     const after = this.night ? BEDTIME_AT_NIGHT_S : BEDTIME_S;
-    if (this.idle < after) {
+    if (this.idle < after || this.heist.on) {
       this.rouse();
       return;
     }
@@ -479,10 +507,36 @@ export class Mind {
       }
     }
     const zooming = dash !== null;
-    const free = up && !zooming;
+
+    // --- Making off with something: the theft says where to go and what to
+    // do, and for as long as it lasts he has no time for anything else.
+    const plan = this.heist.on
+      ? this.heist.step(
+          dt,
+          {
+            x: this.x,
+            pace: this.speed / top,
+            facing: this.facing,
+            settled: up && this.mode === 'grounded' && Math.abs(this.speed) < 0.6 * size,
+          },
+          this.pointer,
+          ground,
+        )
+      : null;
+    if (plan && plan.hop > 0 && up && this.mode === 'grounded') {
+      this.mode = 'airborne';
+      this.rise = Math.sqrt(2 * GRAVITY * plan.hop) * size;
+      this.squash.velocity += 2;
+      this.ear.velocity += 2.6;
+    }
+
+    const free = up && !zooming && plan === null;
     const part = free ? this.role : null;
-    // What he goes to and looks at: what he is guarding, or else the pointer.
-    const mark = this.guarded ?? this.pointer;
+    // What he goes to and looks at: what the theft has his eye on; or what
+    // he is guarding; or else the pointer.
+    const mark = plan ? plan.eye : (this.guarded ?? this.pointer);
+    // Whatever he has been set to watch he keeps his eyes on, wherever it is.
+    const intent = plan !== null || this.guarded !== null;
 
     // --- Barking: each bark with a jolt, and the first with a start.
     this.voice = Math.max(0, this.voice - dt / BARK_S);
@@ -508,6 +562,15 @@ export class Mind {
       // Flat out, turning at the last moment; or slowing to a stop.
       const gap = dash - this.x;
       want = Math.sign(gap) * Math.min(top * ZOOM, slowing ? Math.abs(gap) * 8 : Infinity);
+    } else if (plan) {
+      // Where the theft sends him, as fast as it says, slowing to stop there
+      // without running past it.
+      if (up) {
+        const gap = clamp(plan.goal, ground.left, ground.right) - this.x;
+        if (Math.abs(gap) > 0.03 * size) {
+          want = Math.sign(gap) * Math.min(top * plan.pace, Math.abs(gap) * 5);
+        }
+      }
     } else if (mark && this.mode !== 'crouching' && up) {
       const goal = clamp(mark.x, ground.left, ground.right);
       const gap = goal - this.x;
@@ -527,9 +590,13 @@ export class Mind {
     // Going to bed he turns as that takes him.
     if (!up) {
       // Left as it is.
+    } else if (plan && plan.face !== 0 && Math.abs(plan.goal - this.x) < 0.5 * size) {
+      // Where a theft has him stand he faces as it says, and shuffles the
+      // last of the way there without turning his back.
+      this.heading = plan.face;
     } else if (pace > 0.04) {
       this.heading = this.speed > 0 ? 1 : -1;
-    } else if (free && mark && Math.abs(mark.x - this.x) > 0.45 * size) {
+    } else if ((free || plan) && mark && Math.abs(mark.x - this.x) > 0.45 * size) {
       this.heading = mark.x > this.x ? 1 : -1;
     }
     this.facing += (this.heading - this.facing) * toward(dt, 0.055);
@@ -654,11 +721,11 @@ export class Mind {
     // What he is guarding he keeps his eyes on wherever it is, and it may be
     // under his ground, so he looks down at it.
     let look = 0;
-    if (mark && this.mode === 'grounded' && free) {
+    if (mark && this.mode === 'grounded' && (free || plan)) {
       const ahead = Math.abs(mark.x - this.x);
       const above = mark.y - 0.8 * size;
       const angle = Math.atan2(above, Math.max(0.5 * size, ahead));
-      if (this.guarded) {
+      if (intent) {
         look = clamp(angle, -0.9, 0.9) * 0.3 * (1 - this.gait);
       } else {
         const near = 1 - clamp((ahead - 1.2 * size) / (2 * size), 0, 1);
@@ -687,6 +754,12 @@ export class Mind {
     const tap = 0.5 + 0.5 * Math.sin(this.typing * TAU * 9.5);
     const held = clamp(this.card.value, 0, 1);
 
+    // --- Bowing, and his nose going to the ground and up again, as a theft asks.
+    this.bow.step(plan ? plan.bow : 0, 190, 19, dt);
+    this.nose.step(plan ? plan.nose : 0, 520, 36, dt);
+    const bow = clamp(this.bow.value, -0.1, 1.15);
+    const nose = clamp(this.nose.value, -1.2, 1.15);
+
     // --- Compose the pose.
     const pose: Pose = { ...REST };
     // Faster than a full run, his legs go quicker, not further.
@@ -713,6 +786,9 @@ export class Mind {
     pose.foreReach += 16 * atKeys;
     pose.foreLift += atKeys * (20 + 20 * tap * this.keys);
 
+    // In a bow his forelegs slide out ahead of him.
+    pose.foreReach += BOW_REACH * bow;
+
     const bounce = Math.sin(this.stride * 2);
     pose.head = -this.gaze.value + this.gait * (0.03 * bounce + 0.045 * swing) - 0.12 * flight;
     // He looks down at the screen and nods as he types; with the card he holds his head up.
@@ -725,6 +801,10 @@ export class Mind {
     // A bark throws his head back.
     pose.head -= 0.11 * this.voice;
 
+    // Bowing to play he looks up; going for something on the ground his
+    // nose goes down to it; tossing it away, his head is thrown up.
+    pose.head += NOSE_DOWN * nose - BOW_LOOKS_UP * bow * (1 - Math.max(0, nose));
+
     // A yawn: his head goes back and his jaw drops, and his ear with it.
     pose.head -= 0.2 * yawning;
     pose.beard += 0.55 * yawning;
@@ -736,9 +816,10 @@ export class Mind {
     // Lying down, he goes onto his chest first, tipping forward about his
     // hind feet, which stay where they are; then his hips come down, and his
     // head settles onto the ground.
+    // A bow is the start of the same movement, and no more of it.
     const chest = smooth01(lying / 0.6);
     const hips = smooth01((lying - 0.35) / 0.65);
-    const tilt = LIE_TILT * chest;
+    const tilt = LIE_TILT * chest + BOW * bow;
     const turned = Math.abs(this.facing);
     const sunk =
       size *
@@ -758,12 +839,33 @@ export class Mind {
       over = -TAU * t * t * t * (t * (6 * t - 15) + 10);
     }
 
+    const soles = this.height + bob - sunk;
+    const squash = clamp(this.squash.value, 0.7, 1.2);
+    const pitch = 0.05 * swing * this.gait - 0.09 * flight + tilt + over;
+
+    // --- His mouth, placed as the drawing will be: scaled, then leant about
+    // the point his whole body leans about.
+    const drawn = mouthIn(pose, buildFor(this.facing, squash));
+    const px = (drawn.x * size) / HEIGHT;
+    const py = (drawn.y * size) / HEIGHT + LEAN_ABOUT * size;
+    const lean = pitch * this.facing;
+    const cos = Math.cos(lean);
+    const sin = Math.sin(lean);
+    const mouth = {
+      x: this.x + px * cos - py * sin,
+      y: soles + LEAN_ABOUT * size - (px * sin + py * cos),
+    };
+
+    // Where what he is making off with has got to. The theft keeps its own
+    // account of that; a frame gets a copy, to keep.
+    const loot = this.heist.place(mouth, this.facing);
+
     return {
       x: this.x,
-      lift: this.height + bob - sunk,
+      lift: soles,
       facing: this.facing,
-      squash: clamp(this.squash.value, 0.7, 1.2),
-      pitch: 0.05 * swing * this.gait - 0.09 * flight + tilt + over,
+      squash,
+      pitch,
       pose,
       props: { card: clamp(this.card.value, 0, 1.15), laptop: this.laptop },
       bark: this.voice,
@@ -771,6 +873,8 @@ export class Mind {
       barkAim: this.guarded && this.guarded.y < 0 ? -0.3 : 0.5,
       asleep: down && lying > 0.9,
       snores,
+      mouth,
+      loot: loot && { ...loot },
     };
   }
 }

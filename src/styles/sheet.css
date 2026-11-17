@@ -312,7 +312,7 @@
 .rubber {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 4;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -373,6 +373,126 @@
 .countdown__name {
   font-size: 14px;
   line-height: calc(var(--pitch) * 2);
+}
+
+/* ---------- A digit of the seconds can be knocked loose ---------- */
+
+/* Each of them is loose in its cell: under the pointer it tips, one way or
+   the other, which is all the invitation there is. */
+.countdown__value--loose {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.countdown__value--loose .countdown__digit {
+  cursor: pointer;
+  transition:
+    rotate 160ms cubic-bezier(0.3, 1.7, 0.5, 1),
+    translate 160ms cubic-bezier(0.3, 1.7, 0.5, 1);
+}
+
+@media (hover: hover) {
+  .countdown__value--loose .countdown__digit:hover {
+    rotate: -7deg;
+    translate: 0 -0.04em;
+  }
+
+  .countdown__value--loose .countdown__digit:nth-child(even):hover {
+    rotate: 6deg;
+  }
+}
+
+/* With one of them gone the other sits tight until it is back. */
+.countdown__value--short .countdown__digit {
+  cursor: default;
+  rotate: none;
+  translate: none;
+}
+
+/* The one that is away keeps its cell, and goes on counting where it is. */
+.countdown__digit--away {
+  visibility: hidden;
+}
+
+/* Thrown home, it lands in its cell and settles. */
+.countdown__digit--back {
+  transform-origin: 50% 85%;
+  animation: digit-back 320ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+
+@keyframes digit-back {
+  0% {
+    transform: translateY(0.1em) scale(1.08, 0.88);
+  }
+
+  45% {
+    transform: translateY(-0.035em) scale(0.97, 1.04);
+  }
+
+  100% {
+    transform: none;
+  }
+}
+
+/* Away, a copy of it is shown on a layer over the sheet and under Bark: in
+   his mouth, his muzzle is in front of it. What goes past the edge of the
+   page is cut off there. */
+.loose {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.loose[hidden] {
+  display: none;
+}
+
+/* Two panes, each the size of the stage and cut to its part of it: all but
+   the band, and the band. The copy is on both, in the same place. */
+.loose__pane {
+  position: absolute;
+  inset: 0;
+}
+
+/* The copy is a digit in a value, as in the countdown, moved about by its
+   middle. A rim of paper keeps it apart from the ink it passes: the rules,
+   the lead, the words on the plates. On paper the rim does not show. */
+.loose__value {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--ink);
+  text-shadow:
+    2px 0 var(--paper),
+    -2px 0 var(--paper),
+    0 2px var(--paper),
+    0 -2px var(--paper),
+    1.5px 1.5px var(--paper),
+    -1.5px 1.5px var(--paper),
+    1.5px -1.5px var(--paper),
+    -1.5px -1.5px var(--paper);
+}
+
+.loose__value .countdown__digit {
+  display: block;
+  will-change: transform;
+}
+
+/* Crossing the band it is set the other way round, as the band's own words are. */
+.loose__pane--band .loose__value {
+  color: var(--paper);
+  text-shadow:
+    2px 0 var(--ink),
+    -2px 0 var(--ink),
+    0 2px var(--ink),
+    0 -2px var(--ink),
+    1.5px 1.5px var(--ink),
+    -1.5px 1.5px var(--ink),
+    1.5px -1.5px var(--ink),
+    -1.5px -1.5px var(--ink);
 }
 
 .colophon {

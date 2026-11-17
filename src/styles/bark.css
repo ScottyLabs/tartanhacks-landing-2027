@@ -15,7 +15,7 @@
 .bark {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   overflow: hidden;
   pointer-events: none;
 }
@@ -33,9 +33,12 @@
   overflow: visible;
 }
 
-/* White inside, so he passes in front of whatever is behind him. */
+/* White inside, and for a little way outside his line, so he passes in front
+   of whatever is behind him with his outline whole. */
 .bark__fill {
   fill: var(--paper);
+  stroke: var(--paper);
+  stroke-linejoin: round;
 }
 
 .bark__line {
