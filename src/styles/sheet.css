@@ -25,12 +25,7 @@
 }
 
 .no-field .sheet__bottom {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0 calc(var(--pitch) / 2 - 0.5px),
-    var(--ink) calc(var(--pitch) / 2 - 0.5px) calc(var(--pitch) / 2 + 0.5px),
-    transparent calc(var(--pitch) / 2 + 0.5px) var(--pitch)
-  );
+  background-image: var(--rules);
 }
 
 /* Three rows: wordmark, band, drop. Spare height goes to the last, which
@@ -253,9 +248,17 @@
   letter-spacing: -0.008em;
 }
 
-/* The lead's two sentences break between them, never inside one. */
+/* The lead's two sentences break between them, never inside one, wherever
+   one line is too long for the screen. */
+.plate--lead {
+  max-width: 100%;
+  text-align: center;
+  white-space: normal;
+}
+
 .drop__part {
   display: inline-block;
+  white-space: nowrap;
 }
 
 /* The theme's name, struck out with the heaviest line the text can carry. */
@@ -507,6 +510,16 @@
   font-size: 15px;
 }
 
+/* The way on: a line to itself under the rest, in the middle. */
+.colophon__on {
+  flex-basis: 100%;
+  text-align: center;
+}
+
+.colophon__on a {
+  text-decoration: none;
+}
+
 /* ---------- Narrow screens ---------- */
 
 @media (max-width: 1180px) {
@@ -547,6 +560,10 @@
   .colophon {
     flex-direction: column;
     align-items: center;
+  }
+
+  .colophon__on {
+    flex-basis: auto;
   }
 }
 

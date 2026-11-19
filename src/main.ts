@@ -1,6 +1,7 @@
 import { Bark } from './bark/bark.ts';
 import { startCountdown } from './countdown.ts';
 import { Field } from './field/field.ts';
+import { openOnSight } from './opens.ts';
 import { Redaction } from './redaction/redaction.ts';
 import { Theft } from './theft/theft.ts';
 
@@ -37,6 +38,8 @@ async function main(): Promise<void> {
       : null;
 
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // What is below the first screen opens as it is scrolled to.
+  if (!still) openOnSight(document.querySelectorAll('.opens'));
   const band = document.getElementById('band');
   const runway = document.getElementById('runway');
   // He dresses for whichever sign-up link the pointer is over.

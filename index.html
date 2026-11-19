@@ -75,7 +75,26 @@
               "@type": "Organization",
               "name": "ScottyLabs",
               "url": "https://scottylabs.org"
-            }
+            },
+            "sponsor": [
+              { "@type": "Organization", "name": "AppLovin", "url": "https://www.applovin.com/" },
+              { "@type": "Organization", "name": "DoorDash", "url": "https://www.doordash.com/" },
+              { "@type": "Organization", "name": "Hudson River Trading", "url": "https://www.hudsonrivertrading.com/" },
+              { "@type": "Organization", "name": "Jump Trading", "url": "https://www.jumptrading.com/" },
+              { "@type": "Organization", "name": "Mechanize", "url": "https://www.mechanize.work/" },
+              { "@type": "Organization", "name": "Ripple", "url": "https://ripple.com/" },
+              { "@type": "Organization", "name": "Salesforce", "url": "https://www.salesforce.com/" },
+              { "@type": "Organization", "name": "Visa", "url": "https://www.visa.com/" },
+              { "@type": "Organization", "name": "Accenture", "url": "https://www.accenture.com/" },
+              { "@type": "Organization", "name": "Anduril", "url": "https://www.anduril.com/" },
+              { "@type": "Organization", "name": "D. E. Shaw", "url": "https://www.deshaw.com/" },
+              { "@type": "Organization", "name": "Decagon", "url": "https://decagon.ai/" },
+              { "@type": "Organization", "name": "Optiver", "url": "https://optiver.com/" },
+              { "@type": "Organization", "name": "Perplexity", "url": "https://www.perplexity.ai/" },
+              { "@type": "Organization", "name": "Recruit Holdings", "url": "https://recruit-holdings.com/en/" },
+              { "@type": "Organization", "name": "Runpod", "url": "https://www.runpod.io/" },
+              { "@type": "Organization", "name": "Sandia National Laboratories", "url": "https://www.sandia.gov/" }
+            ]
           }
         ]
       }
@@ -96,10 +115,11 @@
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
+    <main>
     <div class="stage" id="stage">
       <canvas class="field" id="field" aria-hidden="true"></canvas>
 
-      <main class="sheet">
+      <div class="sheet">
         <header class="sheet__top">
           <h1 class="wordmark" id="wordmark">
             <span class="visually-hidden">TartanHacks 2027</span>
@@ -180,9 +200,286 @@
             <p class="plate" data-snap>
               Sponsor us: <a href="mailto:sponsorship@scottylabs.org">sponsorship@scottylabs.org</a>
             </p>
+            <p class="colophon__on">
+              <a class="plate" data-snap href="#sponsors">Sponsors <span aria-hidden="true">↓</span></a>
+            </p>
           </footer>
         </div>
-      </main>
+      </div>
     </div>
+
+    <section class="sponsors" id="sponsors" aria-labelledby="sponsors-title">
+      <div class="opens">
+        <h2 class="sponsors__title" id="sponsors-title">Sponsors</h2>
+      </div>
+
+      <div class="tier tier--title opens">
+        <h3 class="tier__name">Title sponsor</h3>
+        <ul class="tier__list" role="list">
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.applovin.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--applovin"
+                src="/src/assets/sponsors/applovin.svg"
+                alt="AppLovin"
+                width="561"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="tier tier--premier opens">
+        <h3 class="tier__name">Premier sponsors</h3>
+        <ul class="tier__list" role="list">
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.doordash.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--doordash"
+                src="/src/assets/sponsors/doordash.svg"
+                alt="DoorDash"
+                width="868"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.hudsonrivertrading.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--hrt"
+                src="/src/assets/sponsors/hrt.svg"
+                alt="Hudson River Trading"
+                width="171"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.jumptrading.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--jumptrading"
+                src="/src/assets/sponsors/jumptrading.svg"
+                alt="Jump Trading"
+                width="230"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link sponsor__link--named" href="https://www.mechanize.work/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--mechanize"
+                src="/src/assets/sponsors/mechanize.svg"
+                alt=""
+                width="97"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="sponsor__name">Mechanize</span>
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://ripple.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--ripple"
+                src="/src/assets/sponsors/ripple.svg"
+                alt="Ripple"
+                width="390"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.salesforce.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--salesforce"
+                src="/src/assets/sponsors/salesforce.svg"
+                alt="Salesforce"
+                width="143"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.visa.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--visa"
+                src="/src/assets/sponsors/visa.svg"
+                alt="Visa"
+                width="310"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="tier tier--partner opens">
+        <h3 class="tier__name">Partner sponsors</h3>
+        <ul class="tier__list" role="list">
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.accenture.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--accenture"
+                src="/src/assets/sponsors/accenture.svg"
+                alt="Accenture"
+                width="386"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.anduril.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--anduril"
+                src="/src/assets/sponsors/anduril.svg"
+                alt="Anduril"
+                width="544"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.deshaw.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--deshaw"
+                src="/src/assets/sponsors/deshaw.svg"
+                alt="D. E. Shaw"
+                width="474"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://decagon.ai/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--decagon"
+                src="/src/assets/sponsors/decagon.svg"
+                alt="Decagon"
+                width="459"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://optiver.com/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--optiver"
+                src="/src/assets/sponsors/optiver.svg"
+                alt="Optiver"
+                width="450"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.perplexity.ai/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--perplexity"
+                src="/src/assets/sponsors/perplexity.svg"
+                alt="Perplexity"
+                width="500"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://recruit-holdings.com/en/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--recruit"
+                src="/src/assets/sponsors/recruit.svg"
+                alt="Recruit Holdings"
+                width="322"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.runpod.io/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--runpod"
+                src="/src/assets/sponsors/runpod.svg"
+                alt="Runpod"
+                width="457"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+          <li class="sponsor">
+            <a class="sponsor__link" href="https://www.sandia.gov/" target="_blank" rel="noopener">
+              <img
+                class="sponsor__logo sponsor__logo--sandia"
+                src="/src/assets/sponsors/sandia.svg"
+                alt="Sandia National Laboratories"
+                width="656"
+                height="100"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <p class="sponsors__close">
+        <span class="plate">
+          <span class="sponsors__part">Sponsor TartanHacks 2027:</span>
+          <span class="sponsors__part"
+            ><a href="mailto:sponsorship@scottylabs.org">sponsorship@scottylabs.org</a></span
+          >
+        </span>
+        <a class="plate" href="#stage">Back to top <span aria-hidden="true">↑</span></a>
+      </p>
+    </section>
+    </main>
   </body>
 </html>

@@ -1,0 +1,321 @@
+/* ---------- Sponsors: the sheet goes on below the first screen ---------- */
+
+/*
+ * Under the stage the rules are drawn by the stylesheet, to the measure the
+ * field gives: the same pitch, the same line. `--seam` is how far the bottom
+ * of the stage is from the next line of the grid, so the rules carry on
+ * across the join without a break in their step.
+ *
+ * Everything vertical in here is a whole number of pitches, which puts every
+ * edge exactly between two rules without anything having to nudge it.
+ */
+.sponsors {
+  display: grid;
+  justify-items: center;
+  row-gap: calc(var(--pitch) * 4);
+  padding: calc(var(--seam) + var(--pitch) * 5) var(--edge) calc(var(--pitch) * 7);
+  background-image: var(--rules);
+  background-position-y: var(--seam);
+}
+
+/* The heading, in the wordmark's own cut. */
+.sponsors__title {
+  margin: 0;
+  padding-inline: calc(var(--pitch) * 2.4);
+  background: var(--paper);
+  font-family: var(--font-wide);
+  font-size: clamp(34px, 4.6vw, 58px);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: calc(var(--pitch) * 7);
+  letter-spacing: -0.012em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ---------- A tier: its name, and its sponsors in rows ---------- */
+
+/*
+ * Three things set a tier apart, and nothing else: how many sponsors go
+ * across, how tall their cells are, and how big a logo is in its cell.
+ *
+ *   --across  cells to a row
+ *   --cell    the most a cell is wide
+ *   --rows    a cell's height, in pitches
+ *   --unit    the width of a square logo, as a share of its cell's width
+ */
+.tier {
+  display: grid;
+  justify-items: center;
+  row-gap: var(--pitch);
+  width: 100%;
+}
+
+.tier--title {
+  --across: 1;
+  --cell: calc(var(--pitch) * 62);
+  --rows: 19;
+  --unit: 0.27;
+}
+
+.tier--premier {
+  --across: 4;
+  --cell: calc(var(--pitch) * 27);
+  --rows: 12;
+  --unit: 0.285;
+}
+
+.tier--partner {
+  --across: 5;
+  --cell: calc(var(--pitch) * 21);
+  --rows: 9;
+  --unit: 0.25;
+}
+
+.tier__name {
+  margin: 0;
+  padding-inline: calc(var(--pitch) * 1.2);
+  background: var(--paper);
+  font-size: 19px;
+  font-weight: 800;
+  font-stretch: 125%;
+  line-height: calc(var(--pitch) * var(--plate-rows));
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+
+/* Rows of cells, each row centred, with a row of rules showing between two. */
+.tier__list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: var(--pitch);
+  width: 100%;
+  max-width: calc(var(--cell) * var(--across));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A cell is a clearing in the rules, like a unit of the countdown. A hair
+   under an even share of the row to start from, so that a rounded pixel
+   never pushes the last one over; then it grows to its share and no more. */
+.sponsor {
+  container-type: inline-size;
+  flex: 1 0 calc(100% / var(--across) - 1px);
+  max-width: calc(100% / var(--across));
+  height: calc(var(--pitch) * var(--rows));
+  background: var(--paper);
+}
+
+/* A hairline between neighbours, as between the countdown's units: on every
+   cell but the first of its row. The counts here are the tiers' `--across`. */
+.sponsor {
+  border-left: var(--hairline) solid var(--ink);
+}
+
+.tier--title .sponsor,
+.tier--premier .sponsor:nth-child(4n + 1),
+.tier--partner .sponsor:nth-child(5n + 1) {
+  border-left: 0;
+}
+
+.sponsor__link {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * The logos are the one place on the page with more than ink and paper. Each
+ * is the sponsor's own artwork: in black where the sponsor publishes its logo
+ * in black, and otherwise in the sponsor's colours. Nothing here recolours
+ * one.
+ *
+ * Logos come in every shape, and the same height or the same width for all
+ * of them would make the long ones shout and the square ones whisper. Each
+ * is given a width that goes with its own proportions instead: `--w`, set
+ * per logo below, is its width over its height, raised to the power 0.57. A
+ * square logo is one unit wide; a wordmark four times as wide as it is tall
+ * is a little over two. They then carry about the same weight on the page.
+ */
+.sponsor__logo {
+  display: block;
+  /* Where a cell cannot be measured, by the widest a cell gets. */
+  width: calc(var(--cell) * var(--unit) * var(--w, 2));
+  width: calc(100cqw * var(--unit) * var(--w, 2));
+  max-width: 78%;
+  height: auto;
+}
+
+/* The logos, each with its width. */
+
+.sponsor__logo--applovin {
+  --w: 2.67;
+}
+
+.sponsor__logo--doordash {
+  --w: 3.43;
+}
+
+.sponsor__logo--hrt {
+  --w: 1.28;
+}
+
+.sponsor__logo--jumptrading {
+  --w: 1.61;
+}
+
+.sponsor__logo--mechanize {
+  --w: 0.73;
+}
+
+.sponsor__logo--ripple {
+  --w: 2.17;
+}
+
+.sponsor__logo--salesforce {
+  --w: 1.30;
+}
+
+.sponsor__logo--visa {
+  --w: 1.64;
+}
+
+.sponsor__logo--accenture {
+  --w: 2.16;
+}
+
+.sponsor__logo--anduril {
+  --w: 2.63;
+}
+
+.sponsor__logo--deshaw {
+  --w: 2.57;
+}
+
+.sponsor__logo--decagon {
+  --w: 2.38;
+}
+
+.sponsor__logo--optiver {
+  --w: 2.36;
+}
+
+.sponsor__logo--perplexity {
+  --w: 2.50;
+}
+
+.sponsor__logo--recruit {
+  --w: 2.18;
+}
+
+.sponsor__logo--runpod {
+  --w: 2.38;
+}
+
+.sponsor__logo--sandia {
+  --w: 3.07;
+}
+
+/* Under the pointer a cell is framed in the band's own weight of line. The
+   logo is left exactly as it is: it is the sponsor's, not the page's. */
+@media (hover: hover) {
+  .sponsor__link:hover {
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+}
+
+/* A logo that is a symbol alone, with no name in it, has its name set under
+   it, as the countdown's numbers have theirs. */
+.sponsor__link--named {
+  align-content: center;
+  row-gap: var(--pitch);
+  color: inherit;
+  text-decoration: none;
+}
+
+.sponsor__name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: calc(var(--pitch) * 2);
+}
+
+.sponsor__link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: calc(var(--pitch) * -1);
+}
+
+/* ---------- The last line of the page ---------- */
+
+.sponsors__close {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--pitch) calc(var(--pitch) * 2);
+  margin: 0;
+}
+
+/* Where the line has to break, it breaks before the address, never inside it. */
+.sponsors__part {
+  display: inline-block;
+}
+
+/* ---------- Opening ---------- */
+
+/*
+ * What is further down the page than the first screen opens outward from
+ * the centre axis the first time it is scrolled to, as the first screen did
+ * when it arrived. The script shuts a block that is still out of sight, and
+ * lets it go when it comes into view. Without the script nothing is shut.
+ *
+ * It is what is in a block that is cut, never the block itself: a block cut
+ * to nothing has no size to be seen coming into view by.
+ */
+.opens > * {
+  clip-path: inset(0 0);
+  transition: clip-path 640ms var(--ease-out);
+}
+
+.opens.shut > * {
+  clip-path: inset(0 50%);
+  transition: none;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 720px) {
+  .tier--title {
+    --rows: 17;
+    --unit: 0.3;
+  }
+
+  .tier--premier {
+    --across: 2;
+    --cell: calc(var(--pitch) * 29);
+    --rows: 13;
+    --unit: 0.33;
+  }
+
+  .tier--partner {
+    --across: 3;
+    --cell: calc(var(--pitch) * 22);
+    --rows: 11;
+    --unit: 0.3;
+  }
+
+  .tier--premier .sponsor:nth-child(4n + 1),
+  .tier--partner .sponsor:nth-child(5n + 1) {
+    border-left: var(--hairline) solid var(--ink);
+  }
+
+  .tier--premier .sponsor:nth-child(2n + 1),
+  .tier--partner .sponsor:nth-child(3n + 1) {
+    border-left: 0;
+  }
+
+  .tier__name {
+    font-size: 17px;
+  }
+}

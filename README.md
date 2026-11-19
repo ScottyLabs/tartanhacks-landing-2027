@@ -2,11 +2,12 @@
 
 The teaser site for TartanHacks 2027: February 5–6 at Carnegie Mellon University, Pittsburgh, hosted by [ScottyLabs](https://scottylabs.org).
 
-It does three jobs until registration opens on December 1, with the theme announced after that:
+It does four jobs until registration opens on December 1, with the theme announced after that:
 
 - says when and where,
 - counts down to registration opening,
-- sends students to the pre-registration form and judges to the judge interest form.
+- sends students to the pre-registration form and judges to the judge interest form,
+- names the sponsors, below the first screen.
 
 Bark, the ScottyLabs dog, lives on it too: he walks along the top of the sign-up band after your pointer, and jumps when you press him.
 
@@ -40,6 +41,7 @@ Everything a visitor reads is in `index.html`.
 | Form links | the two `<a class="band__half">` links in `index.html` |
 | When registration opens | the `datetime` on `<time id="drop-time">` in `index.html` (midnight Eastern, December 1, 2026) |
 | The site's public address | `VITE_SITE_URL` in `.env`, used for the share image |
+| Sponsors | the `<section class="sponsors">` in `index.html`; see [Sponsors](#sponsors) |
 | Share image | `public/og.png` (1200 × 630) |
 | Search listing | the `<title>`, the description and the event data (`application/ld+json`) in the head of `index.html` |
 
@@ -52,6 +54,8 @@ index.html              content and structure
 public/                 files served as they are (boot script, favicon, share image)
 src/main.ts             starts the countdown and the field
 src/countdown.ts        countdown maths and rendering
+src/opens.ts            opens what is below the first screen as it is scrolled to
+src/assets/sponsors/    the sponsors' logos, one SVG each, in one colour
 src/bark/               Bark, the ScottyLabs dog
   shape.ts                his three strokes, fitted to the ScottyLabs mark
   pose.ts                 everything that can move, and the drawing in a pose
@@ -75,6 +79,27 @@ The background is one WebGL 2 canvas behind the page. It draws a sheet of horizo
 - **The DOM owns layout.** The wordmark is real text. The field measures where the browser put each glyph and draws the wordmark at exactly that spot; the text itself stays in place, transparent, for selection and screen readers.
 - **Everything sits on the rule grid.** The distance between two rules is the *pitch*. The field rounds it to whole device pixels so the rules stay sharp, writes the exact value to the `--pitch` custom property, and CSS sizes everything vertical in pitches. Elements marked `data-snap` are nudged so their edges fall between rules.
 - **It only draws when something changes.** Frames run during the entrance, then stop.
+
+### Sponsors
+
+Below the first screen the sheet goes on, ruled by the stylesheet to the measure the field gives (`--pitch`, `--rule-top`, `--rule-width`, and `--seam` for where the first screen ends), so the rules run across the join without a break. The sponsors are set on it in three tiers: title, premier and partner. A tier differs from another only in how many cells go across, how tall they are, and how big a logo is in its cell; those are four custom properties at the top of `src/styles/sponsors.css`.
+
+Every logo is the company's own artwork, and stays on its brand: in black where the company publishes its logo in black, and otherwise in the company's own colours. Nothing is redrawn or recoloured to suit the page. The logos are the one place on the site with more than ink and paper.
+
+What is done to a logo file before it goes in, and nothing else:
+
+- its `viewBox` is drawn tight round the artwork, so that sizes compare (brand kits build clear space into the file);
+- colours and line settings are written onto the shapes as attributes, and any `<style>` block or `style` attribute is taken out. The security policy applies to the logo files too, and would block them;
+- numbers are written more shortly, to four decimal places.
+
+To add a sponsor:
+
+1. Put its logo in `src/assets/sponsors/` as an SVG prepared as above: the official black version if there is one, otherwise the official colour version for light backgrounds.
+2. Add an `<li class="sponsor">` to its tier's list in `index.html`, copying a neighbour: the link, the logo's `width` and `height` from its `viewBox`, and the company's name as the `alt`. Within a tier they are in alphabetical order.
+3. Give the logo its width in `src/styles/sponsors.css`: one line, `--w`, which is the logo's width over its height, raised to the power 0.57. That is what makes a long wordmark and a square mark carry the same weight.
+4. Add it to the event data (`"sponsor"` in the `application/ld+json` block in the head of `index.html`).
+
+To move a sponsor to another tier, move its `<li>`.
 
 ### Bark
 

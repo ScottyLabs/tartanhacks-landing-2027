@@ -234,6 +234,9 @@ export class Field {
     const centre = Math.floor((pitch - thin) / 2) + thin / 2;
     const pitchCss = pitch / scale;
     root.style.setProperty('--pitch', `${pitchCss}px`);
+    // And one rule, for where the stylesheet goes on with the rules itself.
+    root.style.setProperty('--rule-top', `${Math.floor((pitch - thin) / 2) / scale}px`);
+    root.style.setProperty('--rule-width', `${thin / scale}px`);
 
     // Nudge each target so its top edge falls exactly between two rules.
     for (const target of this.snapTargets) target.style.translate = '';
@@ -245,6 +248,12 @@ export class Field {
     this.snapTargets.forEach((target, i) => {
       target.style.translate = `0 ${nudges[i] ?? 0}px`;
     });
+
+    // The stage need not end on a line of the grid. What follows it is told
+    // how far short of the next one it ends, and starts that much lower.
+    const over = box.height % pitchCss;
+    const seam = over < 0.01 || pitchCss - over < 0.01 ? 0 : pitchCss - over;
+    root.style.setProperty('--seam', `${seam}px`);
 
     // Prefer the browser's own device-pixel measurement, which is exact at
     // fractional pixel ratios. Emulated ratios can report CSS pixels here, so

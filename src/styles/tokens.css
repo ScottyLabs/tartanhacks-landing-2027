@@ -22,6 +22,23 @@
   --edge: clamp(16px, 4vw, 56px);
   --hairline: 1px;
 
+  /*
+   * One rule of the sheet, for wherever the stylesheet has to draw the rules
+   * itself: how far down its pitch a rule starts, and how thick it is. The
+   * field writes the exact values here, as it does the pitch. `--seam` is
+   * how far the bottom of the first screen is from the next line of the
+   * grid; what follows the first screen starts that much lower.
+   */
+  --rule-top: calc(var(--pitch) / 2 - 0.5px);
+  --rule-width: 1px;
+  --seam: 0px;
+  --rules: repeating-linear-gradient(
+    to bottom,
+    transparent 0 var(--rule-top),
+    var(--ink) var(--rule-top) calc(var(--rule-top) + var(--rule-width)),
+    transparent calc(var(--rule-top) + var(--rule-width)) var(--pitch)
+  );
+
   --font-text: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
   --font-wide: 'Archivo Wide', 'Archivo', 'Arial Black', sans-serif;
 
