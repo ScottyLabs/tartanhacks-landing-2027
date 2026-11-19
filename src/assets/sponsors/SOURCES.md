@@ -14,6 +14,7 @@ Each file here is the company's own artwork, fetched on 2026-11-19. The rule for
 | `visa.svg` | Colour (Visa Blue) | Visa Brand Center, brand.visa.com | Visa also supplies black, for use where colour cannot be had |
 | `accenture.svg` | Black wordmark with the purple mark | The logo file on Accenture's investor site, which is the reversed version (white wordmark); the wordmark is set in black here, as Accenture shows it on white | No brand kit is public |
 | `anduril.svg` | Black | The logo file on anduril.com, which is white; the same artwork as the black PNG in Anduril's press kit | |
+| `citadel.svg` | Colour (blue `#002E6C`, as drawn) | Wikimedia Commons, taken from a Citadel document. citadel.com refuses automated downloads. The design was checked against Citadel's US trademark registration 7766799 (registered 2025, "all appearing in blue"), which it matches | Ask for an official file. This is Citadel, not Citadel Securities, which has its own logo |
 | `deshaw.svg` | Black | The logo file on deshaw.com, which is white | Only a white version is published |
 | `decagon.svg` | Black | The header logo of decagon.ai | No brand kit is public |
 | `optiver.svg` | Colour (as on optiver.com) | The header logo of optiver.com | No brand kit is public |
